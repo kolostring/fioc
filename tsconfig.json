@@ -5,8 +5,7 @@
     "jsx": "react-jsx",
     "lib": ["es2023", "dom"],
     "moduleResolution": "bundler",
-    "target": "ES2023",
-    "module": "es2022"
+    "target": "es6"
   },
   "include": ["src/**/*"],
   "references": []
