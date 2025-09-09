@@ -2,11 +2,10 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "dist",
-    "jsx": "react-jsx",
     "lib": ["es2023", "dom"],
-    "moduleResolution": "bundler",
-    "target": "es6"
+    "target": "es2020",
+    "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "references": []
+  "exclude": ["node_modules/vitest/**", "src/__tests__/**"]
 }

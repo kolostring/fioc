@@ -1,6 +1,6 @@
 {
   "name": "fioc",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "license": "MIT",
   "main": "dist/index.js",
@@ -25,19 +25,17 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "immer": "^10.1.1"
+    "immer": "^10.1.1",
+    "vitest": "^3.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@types/node": "^24.3.1",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.39.1",
-    "vitest": "^3.2.4"
+    "typescript-eslint": "^8.39.1"
   }
 }
