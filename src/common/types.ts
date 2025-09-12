@@ -127,6 +127,19 @@ export interface DIContainerBuilder {
   ): DIContainerBuilder;
 
   /**
+   * Registers one or more consumers/use cases in the container.
+   *
+   * @param values - The DI consumer array to register.
+   * @returns The updated DIContainerBuilder instance.
+   */
+  registerConsumerArray<
+    Deps extends DIConsumerDependencies,
+    Params extends DIConsumerParams
+  >(
+    values: DIConsumer<Deps, Params>[]
+  ): DIContainerBuilder;
+
+  /**
    * Finalizes the container and creates a static DIContainer instance.
    *
    * @returns The finalized DIContainer instance.

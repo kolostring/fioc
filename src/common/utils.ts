@@ -83,6 +83,16 @@ export function buildContainer(
 
       return buildContainer(newState);
     },
+    registerConsumerArray(values): DIContainerBuilder {
+      const newState = produce(containerState, (draft) => {
+        values.forEach((value) => {
+          draft[value.token] = value;
+        });
+        return draft;
+      });
+
+      return buildContainer(newState);
+    },
     makeStatic(): DIContainer {
       const diContainer: DIContainer = {
         getState: () => containerState,

@@ -50,6 +50,32 @@ describe("Dependency Injection Container", () => {
     expect(resolvedA).toBe("Consumer C depends on A");
   });
 
+  it("should resolve consumers arrays", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const consumerC = defineDIConsumer({
+      dependencies: [RepoA],
+      factory: (repoA) => () => `Consumer C depends on ${repoA.getFooA()}`,
+      description: "consumerC",
+    });
+
+    const consumerD = defineDIConsumer({
+      dependencies: [RepoA],
+      factory: (repoA) => () => `Consumer D depends on ${repoA.getFooA()}`,
+      description: "consumerD",
+    });
+
+    const container = buildContainer()
+      .register(RepoA, repoAImpl)
+      .registerConsumerArray([consumerC, consumerD])
+      .makeStatic();
+
+    const resolvedAC = container.resolve(consumerC)();
+    expect(resolvedAC).toBe("Consumer C depends on A");
+    const resolvedAD = container.resolve(consumerD)();
+    expect(resolvedAD).toBe("Consumer D depends on A");
+  });
+
   it("should resolve consumers recursively", () => {
     const consumerC = defineDIConsumer({
       dependencies: [RepoA],
