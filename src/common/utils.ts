@@ -14,6 +14,7 @@ import {
   DIContainer,
   DIConsumerDependencies,
   DIConsumerParams,
+  DIManagerBuilder,
 } from "./types";
 
 /**
@@ -63,7 +64,7 @@ export function defineDIConsumer<
  * @param containerState - The initial state of the container (optional).
  * @returns A DI container builder for registering dependencies and creating a static container.
  */
-export function buildContainer(
+export function buildDIContainer(
   containerState: DIContainerState = {}
 ): DIContainerBuilder {
   const diContainer: DIContainerBuilder = {
@@ -73,7 +74,7 @@ export function buildContainer(
         return draft;
       });
 
-      return buildContainer(newState);
+      return buildDIContainer(newState);
     },
     registerConsumer(value): DIContainerBuilder {
       const newState = produce(containerState, (draft) => {
@@ -81,7 +82,7 @@ export function buildContainer(
         return draft;
       });
 
-      return buildContainer(newState);
+      return buildDIContainer(newState);
     },
     registerConsumerArray(values): DIContainerBuilder {
       const newState = produce(containerState, (draft) => {
@@ -91,9 +92,9 @@ export function buildContainer(
         return draft;
       });
 
-      return buildContainer(newState);
+      return buildDIContainer(newState);
     },
-    makeStatic(): DIContainer {
+    getResult(): DIContainer {
       const diContainer: DIContainer = {
         getState: () => containerState,
         resolve: (
@@ -135,45 +136,59 @@ export function buildContainer(
 }
 
 /**
- * Builds a Dependency Injection (DI) manager.
+ * Builds a Dependency Injection (DI) container manager.
  * The manager allows managing multiple containers and switching between them.
  *
  * @param containerManagerState - The initial state of the manager (optional).
  * @returns A DI manager for managing containers and their states.
  */
-export function buildManager(
+export function buildDIContainerManager(
   containerManagerState: DIManagerState = {
     containers: {},
     currentContainer: "default",
   }
-): DIManager {
+): DIManagerBuilder {
   const { containers, currentContainer } = containerManagerState;
 
-  const diManager: DIManager = {
-    getContainer(key: string | undefined) {
-      if (!containers[key ?? currentContainer])
-        throw new Error("Container not found");
-      return buildContainer(containers[key ?? currentContainer]).makeStatic();
-    },
+  const diManagerBuilder: DIManagerBuilder = {
     registerContainer(container, key: string = "default") {
       if (containers[key]) throw new Error(`Container ${key} already exists`);
       const newContainersState = produce(containers, (draft) => {
         draft[key] = container.getState();
         return draft;
       });
-      return buildManager({ containers: newContainersState, currentContainer });
+      return buildDIContainerManager({
+        containers: newContainersState,
+        currentContainer,
+      });
     },
-    setDefaultContainer(key: string) {
-      if (!(key in containers)) {
-        throw new Error(`Container ${key} not found`);
-      }
+    getResult(): DIManager {
+      const diManager: DIManager = {
+        getContainer(key: string | undefined) {
+          if (!containers[key ?? currentContainer])
+            throw new Error("Container not found");
+          return buildDIContainer(
+            containers[key ?? currentContainer]
+          ).getResult();
+        },
+        setDefaultContainer(key: string) {
+          if (!(key in containers)) {
+            throw new Error(`Container ${key} not found`);
+          }
 
-      return buildManager({ ...containerManagerState, currentContainer: key });
-    },
-    getState() {
-      return containerManagerState;
+          return buildDIContainerManager({
+            ...containerManagerState,
+            currentContainer: key,
+          }).getResult();
+        },
+        getState() {
+          return containerManagerState;
+        },
+      };
+
+      return diManager;
     },
   };
 
-  return diManager;
+  return diManagerBuilder;
 }

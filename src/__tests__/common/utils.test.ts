@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildContainer,
+  buildDIContainer,
   createDIToken,
   defineDIConsumer,
 } from "../../common/utils";
@@ -20,10 +20,10 @@ describe("Dependency Injection Container", () => {
     const repoAImpl: RepoA = { getFooA: () => "RepoA Result" };
     const repoBImpl: RepoB = { getFooB: () => "RepoB Result" };
 
-    const container = buildContainer({
+    const container = buildDIContainer({
       [RepoA]: repoAImpl,
       [RepoB]: repoBImpl,
-    }).makeStatic();
+    }).getResult();
 
     const resolvedA = container.resolve(RepoA).getFooA();
     const resolvedB = container.resolve(RepoB).getFooB();
@@ -41,10 +41,10 @@ describe("Dependency Injection Container", () => {
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const container = buildContainer()
+    const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .registerConsumer(consumerC)
-      .makeStatic();
+      .getResult();
 
     const resolvedA = container.resolve(consumerC)();
     expect(resolvedA).toBe("Consumer C depends on A");
@@ -65,10 +65,10 @@ describe("Dependency Injection Container", () => {
       description: "consumerD",
     });
 
-    const container = buildContainer()
+    const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .registerConsumerArray([consumerC, consumerD])
-      .makeStatic();
+      .getResult();
 
     const resolvedAC = container.resolve(consumerC)();
     expect(resolvedAC).toBe("Consumer C depends on A");
@@ -91,11 +91,11 @@ describe("Dependency Injection Container", () => {
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const container = buildContainer()
+    const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .registerConsumer(consumerD)
       .registerConsumer(consumerC)
-      .makeStatic();
+      .getResult();
 
     const resolvedA = container.resolve(consumerD)();
     expect(resolvedA).toBe("Consumer D depends on Consumer C depends on A");
@@ -108,7 +108,7 @@ describe("Dependency Injection Container", () => {
       description: "Consumer",
     });
 
-    const container = buildContainer().makeStatic();
+    const container = buildDIContainer().getResult();
 
     expect(() => container.resolve(consumer)).toThrowError(
       "Token Symbol(RepoA) not found"
@@ -118,7 +118,7 @@ describe("Dependency Injection Container", () => {
   it("should throw an error when resolving an unregistered token", () => {
     const UnregisteredToken = createDIToken("UnregisteredToken");
 
-    const container = buildContainer().makeStatic();
+    const container = buildDIContainer().getResult();
 
     expect(() => container.resolve(UnregisteredToken)).toThrowError(
       "Token Symbol(UnregisteredToken) not found"

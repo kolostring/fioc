@@ -144,7 +144,28 @@ export interface DIContainerBuilder {
    *
    * @returns The finalized DIContainer instance.
    */
-  makeStatic(): DIContainer;
+  getResult(): DIContainer;
+}
+
+/**
+ * Represents a builder for creating a DI manager.
+ * A DI manager builder allows registering containers.
+ */
+export interface DIManagerBuilder {
+  /**
+   * Registers a new container in the manager.
+   *
+   * @param container - The DIContainer instance to register.
+   * @param key - The key to associate with the container (optional).
+   * @returns The updated DIManagerBuilder instance.
+   */
+  registerContainer(container: DIContainer, key?: string): DIManagerBuilder;
+
+  /**
+   * Finalizes the manager and creates a static DIManager instance.
+   * @returns The finalized DIManager instance.
+   */
+  getResult(): DIManager;
 }
 
 /**
@@ -159,15 +180,6 @@ export interface DIManager {
    * @returns The DIContainer instance associated with the key.
    */
   getContainer(key?: string): DIContainer;
-
-  /**
-   * Registers a new container in the manager.
-   *
-   * @param container - The DIContainer instance to register.
-   * @param key - The key to associate with the container (optional).
-   * @returns The updated DIManager instance.
-   */
-  registerContainer(container: DIContainer, key?: string): DIManager;
 
   /**
    * Sets the default container for the manager.
