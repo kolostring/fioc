@@ -42,7 +42,7 @@ export type DIConsumer<
   Deps extends DIConsumerDependencies = DIConsumerDependencies,
   Return = unknown
 > = {
-  token: DIToken<DIConsumer<Deps, Return>>;
+  token: DIToken<Return>;
   dependencies: Deps;
   factory: (...args: DIConsumerFactoryParams<Deps>) => Return;
 };
@@ -106,8 +106,8 @@ export interface DIContainerBuilder {
    * @param value - The DI consumer to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerConsumer<Deps extends DIConsumerDependencies, Return = unknown>(
-    value: DIConsumer<Deps, Return>
+  registerConsumer<const Deps extends DIConsumerDependencies, Return = unknown>(
+    def: DIConsumer<Deps, Return>
   ): DIContainerBuilder;
 
   /**

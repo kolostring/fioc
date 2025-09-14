@@ -10,7 +10,6 @@ import {
   DIManagerState,
   DIToken,
   DIConsumer,
-  DIConsumerFactoryParams,
   DIContainer,
   DIConsumerDependencies,
   DIManagerBuilder,
@@ -28,29 +27,17 @@ export function createDIToken<T>(desc: string): DIToken<T> {
 }
 
 /**
- * Defines a Dependency Injection (DI) consumer.
- * Consumers/Use Cases are function factories that depend on interfaces or other consumers.
+ * Converts a class constructor to a factory function.
+ * This is useful for creating consumers out of classes.
  *
- * @param def - An object containing:
- *   - `dependencies`: An array of tokens representing the dependencies.
- *   - `factory`: A function that takes recursively resolved dependencies and returns the consumer function.
- *   - `description`: An optional description for the consumer.
- * @returns A DI consumer object with a unique token.
+ * @param Ctor - The class constructor to convert.
+ * @returns A factory function that creates instances of the class.
  */
-export function defineDIConsumer<
-  const Deps extends DIConsumerDependencies,
-  Return = unknown
->(def: {
-  dependencies: Deps;
-  factory: (...args: DIConsumerFactoryParams<Deps>) => Return;
-  description?: string;
-}): DIConsumer<Deps, Return> {
-  return {
-    ...def,
-    token: createDIToken<DIConsumer<Deps, Return>>(
-      def.description ?? "DIConsumer"
-    ),
-  };
+export function toFactory<
+  Args extends any[],
+  C extends new (...args: Args) => any
+>(Ctor: C): (...args: ConstructorParameters<C>) => InstanceType<C> {
+  return (...args) => new Ctor(...args);
 }
 
 /**
@@ -104,7 +91,9 @@ export function buildDIContainer(
             const token = consumer;
 
             if (!(token in containerState))
-              throw new Error(`Token Symbol(${token.description}) not found`);
+              throw new Error(
+                `Could not Resolve: Token Symbol(${token.description}) not found`
+              );
             const state = containerState[token];
 
             if (!(state as DIConsumer).dependencies) {

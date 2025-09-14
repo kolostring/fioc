@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildDIContainer,
-  createDIToken,
-  defineDIConsumer,
-} from "../../common/utils";
+import { buildDIContainer, createDIToken, toFactory } from "../../common/utils";
 
 interface RepoA {
   getFooA: () => string;
@@ -33,41 +29,82 @@ describe("Dependency Injection Container", () => {
   });
 
   it("should resolve consumers", () => {
-    const consumerC = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => () => `Consumer C depends on ${repoA.getFooA()}`,
-      description: "consumerC",
-    });
+    const consumerCFactory = (repoA: RepoA) => () =>
+      `Consumer C depends on ${repoA.getFooA()}`;
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerConsumer(consumerC)
+      .registerConsumer({
+        token: consumerC,
+        factory: consumerCFactory,
+        dependencies: [RepoA],
+      })
       .getResult();
 
     const resolvedA = container.resolve(consumerC)();
     expect(resolvedA).toBe("Consumer C depends on A");
   });
 
-  it("should register consumer arrays", () => {
+  it("should register consumer classes", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const consumerC = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => () => `Consumer C depends on ${repoA.getFooA()}`,
-      description: "consumerC",
-    });
+    class ConsumerClass {
+      constructor(private readonly repoA: RepoA) {}
 
-    const consumerD = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => () => `Consumer D depends on ${repoA.getFooA()}`,
-      description: "consumerD",
-    });
+      fooA() {
+        return `From Consumer Class ${this.repoA.getFooA()}`;
+      }
+    }
+
+    const consumerClassToken = createDIToken<ConsumerClass>("consumerClass");
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerConsumerArray([consumerC, consumerD])
+      .registerConsumer({
+        token: consumerClassToken,
+        factory: toFactory(ConsumerClass),
+        dependencies: [RepoA],
+      })
+      .getResult();
+
+    const resolvedA = container.resolve(consumerClassToken).fooA();
+    expect(resolvedA).toBe("From Consumer Class A");
+  });
+
+  it("should register consumer arrays", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const consumerCFactory = (repoA: RepoA) => () =>
+      `Consumer C depends on ${repoA.getFooA()}`;
+
+    const consumerDFactory = (repoA: RepoA) => () =>
+      `Consumer D depends on ${repoA.getFooA()}`;
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const consumerD =
+      createDIToken<ReturnType<typeof consumerDFactory>>("consumerDToken");
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerConsumerArray([
+        {
+          token: consumerC,
+          factory: consumerCFactory,
+          dependencies: [RepoA],
+        },
+        {
+          token: consumerD,
+          factory: consumerDFactory,
+          dependencies: [RepoA],
+        },
+      ])
       .getResult();
 
     const resolvedAC = container.resolve(consumerC)();
@@ -79,25 +116,34 @@ describe("Dependency Injection Container", () => {
   it("should register consumer arrays with variable function parameters", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const consumerC = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => (arg1: string, arg2: number) =>
-        `Consumer C (${arg1}, ${arg2}) depends on ${repoA.getFooA()}`,
-      description: "consumerC",
-    });
+    const consumerCFactory = (repoA: RepoA) => (arg1: string, arg2: number) =>
+      `Consumer C (${arg1}, ${arg2}) depends on ${repoA.getFooA()}`;
 
-    const consumerD = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => (arg: string[]) =>
-        `Consumer D ([${arg.reduce(
-          (acc, cur) => `${acc}, ${cur}`
-        )}]) depends on ${repoA.getFooA()}`,
-      description: "consumerD",
-    });
+    const consumerDFactory = (repoA: RepoA) => (arg: string[]) =>
+      `Consumer D ([${arg.reduce(
+        (acc, cur) => `${acc}, ${cur}`
+      )}]) depends on ${repoA.getFooA()}`;
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const consumerD =
+      createDIToken<ReturnType<typeof consumerDFactory>>("consumerDToken");
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerConsumerArray([consumerC, consumerD])
+      .registerConsumerArray([
+        {
+          token: consumerC,
+          factory: consumerCFactory,
+          dependencies: [RepoA],
+        },
+        {
+          token: consumerD,
+          factory: consumerDFactory,
+          dependencies: [RepoA],
+        },
+      ])
       .getResult();
 
     const resolvedAC = container.resolve(consumerC)("arg1", 1);
@@ -107,24 +153,34 @@ describe("Dependency Injection Container", () => {
   });
 
   it("should resolve consumers recursively", () => {
-    const consumerC = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA) => () => `Consumer C depends on ${repoA.getFooA()}`,
-      description: "consumerC",
-    });
+    const consumerCFactory = (repoA: RepoA) => () =>
+      `Consumer C depends on ${repoA.getFooA()}`;
 
-    const consumerD = defineDIConsumer({
-      dependencies: [consumerC.token],
-      factory: (c) => () => `Consumer D depends on ${c()}`,
-      description: "consumerD",
-    });
+    const consumerDFactory = (c: ReturnType<typeof consumerCFactory>) => () =>
+      `Consumer D depends on ${c()}`;
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const consumerD =
+      createDIToken<ReturnType<typeof consumerDFactory>>("consumerDToken");
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerConsumer(consumerD)
-      .registerConsumer(consumerC)
+      .registerConsumerArray([
+        {
+          token: consumerC,
+          factory: consumerCFactory,
+          dependencies: [RepoA],
+        },
+        {
+          token: consumerD,
+          factory: consumerDFactory,
+          dependencies: [consumerC],
+        },
+      ])
       .getResult();
 
     const resolvedA = container.resolve(consumerD)();
@@ -132,13 +188,18 @@ describe("Dependency Injection Container", () => {
   });
 
   it("should throw an error for missing dependencies", () => {
-    const consumer = defineDIConsumer({
-      dependencies: [RepoA],
-      factory: (repoA: RepoA) => () => repoA.getFooA(),
-      description: "Consumer",
-    });
+    const consumerCFactory = (repoA: RepoA) => () => repoA.getFooA();
 
-    const container = buildDIContainer().getResult();
+    const consumer =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const container = buildDIContainer()
+      .registerConsumer({
+        token: consumer,
+        factory: consumerCFactory,
+        dependencies: [RepoA],
+      })
+      .getResult();
 
     expect(() => container.resolve(consumer)).toThrowError(
       "Token Symbol(RepoA) not found"
@@ -152,6 +213,36 @@ describe("Dependency Injection Container", () => {
 
     expect(() => container.resolve(UnregisteredToken)).toThrowError(
       "Token Symbol(UnregisteredToken) not found"
+    );
+  });
+
+  it("should throw an error on circular dependency", () => {
+    const consumerCFactory = (d: () => string) => () => d();
+
+    const consumerDFactory = (c: ReturnType<typeof consumerCFactory>) => () =>
+      c();
+
+    const consumerD =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerDToken");
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const container = buildDIContainer()
+      .registerConsumer({
+        token: consumerC,
+        factory: consumerCFactory,
+        dependencies: [consumerD],
+      })
+      .registerConsumer({
+        token: consumerD,
+        factory: consumerDFactory,
+        dependencies: [consumerC],
+      })
+      .getResult();
+
+    expect(() => container.resolve(consumerD)).toThrowError(
+      "Maximum call stack size exceeded"
     );
   });
 });
