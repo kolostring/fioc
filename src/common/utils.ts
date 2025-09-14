@@ -84,7 +84,9 @@ export function buildDIContainer(
 
       return buildDIContainer(newState);
     },
-    registerConsumerArray(values): DIContainerBuilder {
+    registerConsumerArray<T extends readonly DIConsumer[]>(
+      values: T
+    ): DIContainerBuilder {
       const newState = produce(containerState, (draft) => {
         values.forEach((value) => {
           draft[value.token] = value;
