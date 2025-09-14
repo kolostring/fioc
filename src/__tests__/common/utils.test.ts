@@ -50,7 +50,7 @@ describe("Dependency Injection Container", () => {
     expect(resolvedA).toBe("Consumer C depends on A");
   });
 
-  it("should resolve consumers arrays", () => {
+  it("should register consumer arrays", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     const consumerC = defineDIConsumer({
@@ -74,6 +74,36 @@ describe("Dependency Injection Container", () => {
     expect(resolvedAC).toBe("Consumer C depends on A");
     const resolvedAD = container.resolve(consumerD)();
     expect(resolvedAD).toBe("Consumer D depends on A");
+  });
+
+  it("should register consumer arrays with variable function parameters", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const consumerC = defineDIConsumer({
+      dependencies: [RepoA],
+      factory: (repoA) => (arg1: string, arg2: number) =>
+        `Consumer C (${arg1}, ${arg2}) depends on ${repoA.getFooA()}`,
+      description: "consumerC",
+    });
+
+    const consumerD = defineDIConsumer({
+      dependencies: [RepoA],
+      factory: (repoA) => (arg: string[]) =>
+        `Consumer D ([${arg.reduce(
+          (acc, cur) => `${acc}, ${cur}`
+        )}]) depends on ${repoA.getFooA()}`,
+      description: "consumerD",
+    });
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerConsumerArray([consumerC, consumerD])
+      .getResult();
+
+    const resolvedAC = container.resolve(consumerC)("arg1", 1);
+    expect(resolvedAC).toBe("Consumer C (arg1, 1) depends on A");
+    const resolvedAD = container.resolve(consumerD)(["arg1", "arg2"]);
+    expect(resolvedAD).toBe("Consumer D ([arg1, arg2]) depends on A");
   });
 
   it("should resolve consumers recursively", () => {

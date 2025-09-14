@@ -132,12 +132,11 @@ export interface DIContainerBuilder {
    * @param values - The DI consumer array to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerConsumerArray<
-    Deps extends DIConsumerDependencies,
-    Params extends DIConsumerParams
-  >(
-    values: DIConsumer<Deps, Params>[]
-  ): DIContainerBuilder;
+  registerConsumerArray<T extends readonly unknown[]>(values: {
+    [K in keyof T]: T[K] extends DIConsumer<infer D, infer P, infer R>
+      ? T[K]
+      : never;
+  }): DIContainerBuilder;
 
   /**
    * Finalizes the container and creates a static DIContainer instance.
