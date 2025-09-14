@@ -1,6 +1,6 @@
 {
   "name": "fioc",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "license": "MIT",
   "main": "dist/index.js",
@@ -22,6 +22,9 @@
   ],
   "description": "A lightweight and type-safe dependency injection library for JS/TS, designed to simplify dependency management",
   "author": "kolostring <yoerodriguezjunior@gmail.com>",
+  "contributors": [
+    "leonardof02 <leonardoarencibia2002@gmail.com>"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/kolostring/fioc.git"
