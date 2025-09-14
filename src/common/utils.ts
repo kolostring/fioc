@@ -13,7 +13,6 @@ import {
   DIConsumerFactoryParams,
   DIContainer,
   DIConsumerDependencies,
-  DIConsumerParams,
   DIManagerBuilder,
 } from "./types";
 
@@ -40,18 +39,15 @@ export function createDIToken<T>(desc: string): DIToken<T> {
  */
 export function defineDIConsumer<
   const Deps extends DIConsumerDependencies,
-  Params extends DIConsumerParams,
   Return = unknown
 >(def: {
   dependencies: Deps;
-  factory: (
-    ...args: DIConsumerFactoryParams<Deps>
-  ) => (...params: Params) => Return;
+  factory: (...args: DIConsumerFactoryParams<Deps>) => Return;
   description?: string;
-}): DIConsumer<Deps, Params, Return> {
+}): DIConsumer<Deps, Return> {
   return {
     ...def,
-    token: createDIToken<DIConsumer<Deps, Params, Return>>(
+    token: createDIToken<DIConsumer<Deps, Return>>(
       def.description ?? "DIConsumer"
     ),
   };
@@ -101,7 +97,7 @@ export function buildDIContainer(
         getState: () => containerState,
         resolve: (
           consumer:
-            | DIConsumer<DIConsumerDependencies, DIConsumerParams, unknown>
+            | DIConsumer<DIConsumerDependencies, unknown>
             | DIToken<unknown>
         ) => {
           if (typeof consumer === "symbol") {

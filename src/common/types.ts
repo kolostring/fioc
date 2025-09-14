@@ -18,21 +18,16 @@ export type DIToken<T> = symbol & { __type: T };
 export type DIConsumerDependencies = readonly DIToken<unknown>[];
 
 /**
- * Represents the parameters of a DI consumer resolved function.
- */
-export type DIConsumerParams = unknown[];
-
-/**
  * Represents the factory parameters for a DI consumer.
  *
  * @typeParam Deps - The dependencies of the DI consumer.
  */
 export type DIConsumerFactoryParams<Deps> = {
   [K in keyof Deps]: Deps[K] extends DIToken<infer U>
-    ? U extends DIConsumer<infer Deps, infer Params, infer Return>
+    ? U extends DIConsumer<infer Deps, infer Return>
       ? Deps extends never
         ? never
-        : (...args: Params) => Return
+        : Return
       : U
     : never;
 };
@@ -41,19 +36,15 @@ export type DIConsumerFactoryParams<Deps> = {
  * Represents a DI consumer, which is a function factory that depends on interface implementations or other consumers.
  *
  * @typeParam Deps - The dependencies of the consumer.
- * @typeParam Params - The parameters of the consumer resolved function.
  * @typeParam Return - The return type of the consumer resolved function.
  */
 export type DIConsumer<
   Deps extends DIConsumerDependencies = DIConsumerDependencies,
-  Params extends DIConsumerParams = DIConsumerParams,
   Return = unknown
 > = {
-  token: DIToken<DIConsumer<Deps, Params, Return>>;
+  token: DIToken<DIConsumer<Deps, Return>>;
   dependencies: Deps;
-  factory: (
-    ...args: DIConsumerFactoryParams<Deps>
-  ) => (...params: Params) => Return;
+  factory: (...args: DIConsumerFactoryParams<Deps>) => Return;
 };
 
 /**
@@ -82,13 +73,9 @@ export interface DIContainer {
    * @param consumer - The DI token or consumer to resolve. Consumers dependencies will be resolved recursively.
    * @returns The resolved dependency or consumer function.
    */
-  resolve<
-    Deps extends DIConsumerDependencies,
-    Params extends DIConsumerParams,
-    Return = unknown
-  >(
-    consumer: DIConsumer<Deps, Params, Return>
-  ): (...params: Params) => Return;
+  resolve<Deps extends DIConsumerDependencies, Return = unknown>(
+    consumer: DIConsumer<Deps, Return>
+  ): Return;
   resolve<T>(token: DIToken<T>): T;
 
   /**
@@ -119,11 +106,8 @@ export interface DIContainerBuilder {
    * @param value - The DI consumer to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerConsumer<
-    Deps extends DIConsumerDependencies,
-    Params extends DIConsumerParams
-  >(
-    value: DIConsumer<Deps, Params>
+  registerConsumer<Deps extends DIConsumerDependencies, Return = unknown>(
+    value: DIConsumer<Deps, Return>
   ): DIContainerBuilder;
 
   /**
@@ -133,9 +117,7 @@ export interface DIContainerBuilder {
    * @returns The updated DIContainerBuilder instance.
    */
   registerConsumerArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIConsumer<infer D, infer P, infer R>
-      ? T[K]
-      : never;
+    [K in keyof T]: T[K] extends DIConsumer<infer D, infer R> ? T[K] : never;
   }): DIContainerBuilder;
 
   /**
