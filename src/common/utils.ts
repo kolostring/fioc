@@ -19,11 +19,11 @@ import {
  * Creates a Dependency Injection (DI) token.
  * Tokens are unique symbols used to identify dependencies in the DI container carrying a type for casting purposes.
  *
- * @param desc - A description for the token, useful for debugging.
+ * @param key - unique key for the token. Useful for debugging and serialization.
  * @returns A unique symbol representing the DI token carrying a type for casting purposes.
  */
-export function createDIToken<T>(desc: string): DIToken<T> {
-  return Symbol(desc) as DIToken<T>;
+export function createDIToken<T>(key: string): DIToken<T> {
+  return Symbol.for(key) as DIToken<T>;
 }
 
 /**
@@ -92,7 +92,9 @@ export function buildDIContainer(
 
             if (!(token in containerState))
               throw new Error(
-                `Could not Resolve: Token Symbol(${token.description}) not found`
+                `Could not Resolve: Token Symbol(${Symbol.keyFor(
+                  token
+                )}) not found`
               );
             const state = containerState[token];
 
