@@ -15,21 +15,15 @@ export type DIToken<T> = symbol & { __type: T };
  * Represents the dependencies of a DI consumer.
  * This is an array of DI tokens that the consumer depends on.
  */
-export type DIConsumerDependencies = readonly DIToken<unknown>[];
+export type DIConsumerDependencies = readonly unknown[];
 
 /**
  * Represents the factory parameters for a DI consumer.
  *
  * @typeParam Deps - The dependencies of the DI consumer.
  */
-export type DIConsumerFactoryParams<Deps> = {
-  [K in keyof Deps]: Deps[K] extends DIToken<infer U>
-    ? U extends DIConsumer<infer Deps, infer Return>
-      ? Deps extends never
-        ? never
-        : Return
-      : U
-    : never;
+export type DIConsumerFactoryTokenParams<Deps extends readonly unknown[]> = {
+  [K in keyof Deps]: DIToken<Deps[K]>;
 };
 
 /**
@@ -39,12 +33,12 @@ export type DIConsumerFactoryParams<Deps> = {
  * @typeParam Return - The return type of the consumer resolved function.
  */
 export type DIConsumer<
-  Deps extends DIConsumerDependencies = DIConsumerDependencies,
+  Deps extends readonly unknown[] = unknown[],
   Return = unknown
 > = {
   token: DIToken<Return>;
-  dependencies: Deps;
-  factory: (...args: DIConsumerFactoryParams<Deps>) => Return;
+  dependencies: DIConsumerFactoryTokenParams<Deps>;
+  factory: (...args: Deps) => Return;
 };
 
 /**
@@ -117,7 +111,15 @@ export interface DIContainerBuilder {
    * @returns The updated DIContainerBuilder instance.
    */
   registerConsumerArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIConsumer<infer D, infer R> ? T[K] : never;
+    [K in keyof T]: T[K] extends DIConsumer<infer D, infer R>
+      ? T[K]
+      : T[K] extends {
+          token: DIToken<unknown>;
+          dependencies: unknown[];
+          factory: (...args: infer Deps) => infer Res;
+        }
+      ? DIConsumer<Deps, Res>
+      : DIConsumer;
   }): DIContainerBuilder;
 
   /**

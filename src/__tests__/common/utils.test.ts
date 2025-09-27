@@ -152,6 +152,33 @@ describe("Dependency Injection Container", () => {
     expect(resolvedAD).toBe("Consumer D ([arg1, arg2]) depends on A");
   });
 
+  it("should register consumer arrays with more than one dependency", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+    const repoBImpl: RepoB = { getFooB: () => "B" };
+
+    const consumerCFactory =
+      (repoA: RepoA, repoB: RepoB) => (arg1: string, arg2: number) =>
+        `Consumer C (${arg1}, ${arg2}) depends on ${repoA.getFooA()} and ${repoB.getFooB()}`;
+
+    const consumerC =
+      createDIToken<ReturnType<typeof consumerCFactory>>("consumerCToken");
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .register(RepoB, repoBImpl)
+      .registerConsumerArray([
+        {
+          token: consumerC,
+          factory: consumerCFactory,
+          dependencies: [RepoA, RepoB],
+        },
+      ])
+      .getResult();
+
+    const resolvedAC = container.resolve(consumerC)("arg1", 1);
+    expect(resolvedAC).toBe("Consumer C (arg1, 1) depends on A and B");
+  });
+
   it("should resolve consumers recursively", () => {
     const consumerCFactory = (repoA: RepoA) => () =>
       `Consumer C depends on ${repoA.getFooA()}`;
