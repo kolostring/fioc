@@ -1,15 +1,15 @@
 # FIOC
 
-FIOC (Functional Inversion Of Control) is a lightweight dependency injection library for JS/TS applications. It simplifies the management of dependencies in your functional environments by providing a flexible and type-safe way to define, register, and resolve dependencies, without the need of reflection, decorators.
+FIOC (Functional Inversion Of Control) is a lightweight dependency injection library for JS/TS applications. It simplifies the management of dependencies by providing a flexible and **type-safe** way to define, register, and resolve dependencies, without the need of reflection or decorators.
 
-Now also with class support!
+**Now also with class support!**
 
 ## Features
 
 - **Type-Safe Dependency Injection**: Define and resolve dependencies with full TypeScript support. No need to cast.
 - **Non String Tokens**: Define and resolve dependencies with non-string tokens.
 - **Lightweight**: Minimal overhead, designed to integrate seamlessly into your existing projects.
-- **As Complex as You Want**: Going from just registering implementations of interfaces to registering consumers/use cases with recursive dependencies resolution.
+- **As Complex as You Want**: Going from just registering implementations of interfaces to registering factories/use cases (and even classes) with recursive dependencies resolution.
 
 ## Installation
 
@@ -62,11 +62,13 @@ const onlineContainer = buildDIContainer()
   .getResult();
 ```
 
-### 3. Configuring the Container Manager
+### 3. Configuring the Container Manager (Optional)
 
-Use the `buildDIManager` function to create a Container Manager. It allows you to register multiple containers and switch between them. Really useful when having multiple environments (like fetching from an API when "online" or fetching from local storage when "offline"). Also realy useful for mocking interfaces.
+The Container Manager allows you to register multiple containers and switch between them. Really useful when having multiple environments (like fetching from an API when "online" or fetching from local storage when "offline"). Also realy useful for mocking interfaces.
 
-You can set the default container by calling the `setDefaultContainer` method. If no key is provided for a container, it will be set as the default container.
+Use the `buildDIManager` function to create a Container Manager.
+
+You can set the default container by calling the `setDefaultContainer` method. If no key is provided to a container, it will be set as the default container.
 
 ```ts
 import { buildDIManager } from "fioc";
@@ -90,15 +92,14 @@ import { ApiServiceToken } from "./interfaces/ApiService";
 const service = DIManager.getContainer().resolve(ApiServiceToken);
 ```
 
-## Consumers/Use Cases/Services
+## Factories
 
-Let's call **Consumers** to all functions, classes or values that have dependencies to interfaces or other consumers. The most common use is for **Use Cases** in business logic. For example, a use case might be to get some data from a repository.
+Let's call **Factories** to all functions that based on parameters (dependencies) "constructs" a value, instance or function. The most common use is for **Use Cases** in business logic, a function that depends on Services or repositories.
 
-To build a consumer:
+How to build a compatible factory:
 
-- Start by defining a factory.
+- Start by defining a simple function, which will be the factory.
 - the token with the return type of the factory.
-- Register the consumer with its dependencies into the container.
 
 ```ts
 import { ApiServiceToken } from "./interfaces/ApiService";
@@ -109,6 +110,10 @@ export const getDataUseCaseFactory = (apiService: ApiService) => () =>
 export const getDataUseCaseToken =
   defineDIToken<ReturnType<typeof getDataUseCaseFactory>>("getDataUseCase");
 ```
+
+Finally, register the factory into the container. You need to define an array of dependencies in form of tokens. This will allow the container to resolve the dependencies recursively.
+
+The container is fully type-safe, so don´t worry about forgetting dependencies or using the wrong type.
 
 ```ts
 import { ApiService, ApiServiceToken } from "./interfaces/ApiService";
@@ -125,8 +130,8 @@ const ApiServiceImpl: ApiService = {
 const DIManager = buildDIManager().registerContainer(
   buildDIContainer()
     .register(ApiServiceToken, ApiServiceImpl)
-    .registerConsumer({
-      dependencies: [ApiServiceToken], // if dependencies types doesn't match with your factory params (including the order), you will get a type error
+    .registerFactory({
+      dependencies: [ApiServiceToken], // if dependencies types don't match with your factory params (including the order), you will get a type error
       token: getDataUseCaseToken,
       factory: getDataUseCaseFactory,
     })
@@ -134,11 +139,11 @@ const DIManager = buildDIManager().registerContainer(
 );
 ```
 
-To resolve a consumer, just use regular `resolve` method. Tho keep in mind any time you resolve a consumer, the dependencies will be resolved recursively **every time**. You can implement yourself a cache to avoid this.
+To resolve a factory, just use regular `resolve` method. Tho keep in mind any time you resolve a factory, the dependencies will be resolved recursively **every time**. You can implement yourself a cache to avoid this.
 
-## Consumer Classes
+## Classes Factory
 
-Consumers can also be classes. You can use the function `constructorToFactory` to convert a class constructor to a factory function.
+Factories can also be classes. You can use the function `constructorToFactory` to convert a class constructor to a factory function, or you can do it yourself.
 
 ```ts
 import { ApiService, ApiServiceToken } from "./interfaces/ApiService";
@@ -163,8 +168,8 @@ const ApiServiceImpl: ApiService = {
 const DIManager = buildDIManager().registerContainer(
   buildDIContainer()
     .register(ApiServiceToken, ApiServiceImpl)
-    .registerConsumer({
-      dependencies: [ApiServiceToken], // if dependencies types doesn't match with your factory params (including the order), you will get a type error
+    .registerFactory({
+      dependencies: [ApiServiceToken], // if dependencies types don't match with your factory params (including the order), you will get a type error
       token: getDataUseCaseToken,
       factory: constructorToFactory(GetDataUseCase),
     })

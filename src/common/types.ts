@@ -1,6 +1,6 @@
 /**
  * This module contains type definitions used throughout the library.
- * These types define the structure of tokens, containers, and consumers.
+ * These types define the structure of tokens, containers, and factories.
  */
 
 /**
@@ -12,32 +12,32 @@
 export type DIToken<T> = symbol & { __type: T };
 
 /**
- * Represents the dependencies of a DI consumer.
- * This is an array of DI tokens that the consumer depends on.
+ * Represents the dependencies of a DI factory.
+ * This is an array of DI tokens that the factory depends on.
  */
-export type DIConsumerDependencies = readonly unknown[];
+export type DIFactoryDependencies = readonly unknown[];
 
 /**
- * Represents the factory parameters for a DI consumer.
+ * Represents the factory parameters for a DI factory.
  *
- * @typeParam Deps - The dependencies of the DI consumer.
+ * @typeParam Deps - The dependencies of the DI factory.
  */
-export type DIConsumerFactoryTokenParams<Deps extends readonly unknown[]> = {
+export type DIFactoryFactoryTokenParams<Deps extends readonly unknown[]> = {
   [K in keyof Deps]: DIToken<Deps[K]>;
 };
 
 /**
- * Represents a DI consumer, which is a function factory that depends on interface implementations or other consumers.
+ * Represents a DI factory, which is a function factory that depends on interface implementations or other factories.
  *
- * @typeParam Deps - The dependencies of the consumer.
- * @typeParam Return - The return type of the consumer resolved function.
+ * @typeParam Deps - The dependencies of the factory.
+ * @typeParam Return - The return type of the factory resolved function.
  */
-export type DIConsumer<
+export type DIFactory<
   Deps extends readonly unknown[] = unknown[],
   Return = unknown
 > = {
   token: DIToken<Return>;
-  dependencies: DIConsumerFactoryTokenParams<Deps>;
+  dependencies: DIFactoryFactoryTokenParams<Deps>;
   factory: (...args: Deps) => Return;
 };
 
@@ -62,13 +62,13 @@ export type DIManagerState = {
  */
 export interface DIContainer {
   /**
-   * Resolves a dependency or consumer from the container.
+   * Resolves a dependency or factory from the container.
    *
-   * @param consumer - The DI token or consumer to resolve. Consumers dependencies will be resolved recursively.
-   * @returns The resolved dependency or consumer function.
+   * @param factory - The DI token or factory to resolve. Factories dependencies will be resolved recursively.
+   * @returns The resolved dependency or factory function.
    */
-  resolve<Deps extends DIConsumerDependencies, Return = unknown>(
-    consumer: DIConsumer<Deps, Return>
+  resolve<Deps extends DIFactoryDependencies, Return = unknown>(
+    factory: DIFactory<Deps, Return>
   ): Return;
   resolve<T>(token: DIToken<T>): T;
 
@@ -82,7 +82,7 @@ export interface DIContainer {
 
 /**
  * Represents a builder for creating a DI container.
- * A DI container builder allows registering dependencies and consumers.
+ * A DI container builder allows registering dependencies and factories.
  */
 export interface DIContainerBuilder {
   /**
@@ -95,31 +95,31 @@ export interface DIContainerBuilder {
   register<T>(token: DIToken<T>, value: T): DIContainerBuilder;
 
   /**
-   * Registers a consumer/use case in the container.
+   * Registers a factory/use case in the container.
    *
-   * @param value - The DI consumer to register.
+   * @param value - The DI factory to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerConsumer<const Deps extends DIConsumerDependencies, Return = unknown>(
-    def: DIConsumer<Deps, Return>
+  registerFactory<const Deps extends DIFactoryDependencies, Return = unknown>(
+    def: DIFactory<Deps, Return>
   ): DIContainerBuilder;
 
   /**
-   * Registers one or more consumers/use cases in the container.
+   * Registers one or more factories/use cases in the container.
    *
-   * @param values - The DI consumer array to register.
+   * @param values - The DI factory array to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerConsumerArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIConsumer<infer D, infer R>
+  registerFactoryArray<T extends readonly unknown[]>(values: {
+    [K in keyof T]: T[K] extends DIFactory<infer D, infer R>
       ? T[K]
       : T[K] extends {
           token: DIToken<unknown>;
           dependencies: unknown[];
           factory: (...args: infer Deps) => infer Res;
         }
-      ? DIConsumer<Deps, Res>
-      : DIConsumer;
+      ? DIFactory<Deps, Res>
+      : DIFactory;
   }): DIContainerBuilder;
 
   /**

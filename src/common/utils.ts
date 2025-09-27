@@ -1,5 +1,5 @@
 /**
- * This module provides utility functions for creating tokens, defining consumers,
+ * This module provides utility functions for creating tokens, defining factories,
  * and building dependency injection containers and managers.
  */
 import { produce } from "immer";
@@ -9,9 +9,9 @@ import {
   DIManager,
   DIManagerState,
   DIToken,
-  DIConsumer,
+  DIFactory,
   DIContainer,
-  DIConsumerDependencies,
+  DIFactoryDependencies,
   DIManagerBuilder,
 } from "./types";
 
@@ -28,12 +28,12 @@ export function createDIToken<T>(key: string): DIToken<T> {
 
 /**
  * Converts a class constructor to a factory function.
- * This is useful for creating consumers out of classes.
+ * This is useful for creating factories out of classes.
  *
  * @param Ctor - The class constructor to convert.
  * @returns A factory function that creates instances of the class.
  */
-export function toFactory<
+export function constructorToFactory<
   Args extends any[],
   C extends new (...args: Args) => any
 >(Ctor: C): (...args: ConstructorParameters<C>) => InstanceType<C> {
@@ -59,7 +59,7 @@ export function buildDIContainer(
 
       return buildDIContainer(newState);
     },
-    registerConsumer(value): DIContainerBuilder {
+    registerFactory(value): DIContainerBuilder {
       const newState = produce(containerState, (draft) => {
         draft[value.token] = value;
         return draft;
@@ -67,7 +67,7 @@ export function buildDIContainer(
 
       return buildDIContainer(newState);
     },
-    registerConsumerArray<T extends readonly DIConsumer[]>(
+    registerFactoryArray<T extends readonly DIFactory[]>(
       values: T
     ): DIContainerBuilder {
       const newState = produce(containerState, (draft) => {
@@ -83,12 +83,10 @@ export function buildDIContainer(
       const diContainer: DIContainer = {
         getState: () => containerState,
         resolve: (
-          consumer:
-            | DIConsumer<DIConsumerDependencies, unknown>
-            | DIToken<unknown>
+          factory: DIFactory<DIFactoryDependencies, unknown> | DIToken<unknown>
         ) => {
-          if (typeof consumer === "symbol") {
-            const token = consumer;
+          if (typeof factory === "symbol") {
+            const token = factory;
 
             if (!(token in containerState))
               throw new Error(
@@ -98,18 +96,18 @@ export function buildDIContainer(
               );
             const state = containerState[token];
 
-            if (!(state as DIConsumer).dependencies) {
+            if (!(state as DIFactory).dependencies) {
               return state as () => unknown;
             }
 
-            return (state as DIConsumer).factory(
-              ...(state as DIConsumer).dependencies.map(
+            return (state as DIFactory).factory(
+              ...(state as DIFactory).dependencies.map(
                 (dep: DIToken<unknown>) => diContainer.resolve(dep)
               )
             );
           } else {
-            return consumer.factory(
-              ...consumer.dependencies.map((dep: DIToken<unknown>) =>
+            return factory.factory(
+              ...factory.dependencies.map((dep: DIToken<unknown>) =>
                 diContainer.resolve(dep)
               )
             );
