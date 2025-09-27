@@ -2,10 +2,11 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/index.ts"],
-  format: ["esm"], // single ESM output
-  dts: true, // generate .d.ts
-  sourcemap: false, // easier debugging
-  minify: true, // optional for browser use
-  clean: true, // remove dist before build
-  target: "es2022",
+  format: ["cjs", "esm"],
+  dts: true,
+  sourcemap: false, // good for debugging
+  minify: true, // optional, can enable for browser use
+  clean: true,
+  target: "es2020",
+  splitting: false, // no code-splitting needed for Node library
 });
