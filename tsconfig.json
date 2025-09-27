@@ -1,11 +1,14 @@
 {
   "compilerOptions": {
-    "declaration": true,
+    "target": "es2022", // modern enough for Node 18+, browsers
+    "lib": ["es2022", "dom"], // baseline APIs for types
+    "module": "es2022", // ESM output
+    "moduleResolution": "bundler",
+    "declaration": true, // generate .d.ts
     "outDir": "dist",
-    "lib": ["es2023", "dom"],
-    "target": "es2020",
-    "moduleResolution": "node"
+    "strict": true,
+    "skipLibCheck": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules/vitest/**", "src/__tests__/**"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/__tests__/**"]
 }

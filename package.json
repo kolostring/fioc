@@ -4,14 +4,12 @@
   "type": "module",
   "license": "MIT",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./dist/index.js"
   },
   "keywords": [
     "dependency injection",
@@ -33,7 +31,7 @@
     "url": "git+https://github.com/kolostring/fioc.git"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -46,6 +44,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "tsup": "^8.5.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
     "vitest": "^3.2.4"
