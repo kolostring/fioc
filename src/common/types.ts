@@ -9,7 +9,10 @@
  *
  * @typeParam T - The type of the dependency associated with the token.
  */
-export type DIToken<T> = symbol & { __type: T };
+export type DIToken<T, K extends string> = symbol & {
+  __type: T;
+  __key: K;
+};
 
 /**
  * Represents the dependencies of a DI factory.
@@ -22,8 +25,11 @@ export type DIFactoryDependencies = readonly unknown[];
  *
  * @typeParam Deps - The dependencies of the DI factory.
  */
-export type DIFactoryFactoryTokenParams<Deps extends readonly unknown[]> = {
-  [K in keyof Deps]: DIToken<Deps[K]>;
+export type DIFactoryFactoryTokenParams<
+  Deps extends readonly unknown[],
+  Key extends string
+> = {
+  [K in keyof Deps]: DIToken<Deps[K], Key>;
 };
 
 /**
@@ -33,11 +39,12 @@ export type DIFactoryFactoryTokenParams<Deps extends readonly unknown[]> = {
  * @typeParam Return - The return type of the factory resolved function.
  */
 export type DIFactory<
+  Key extends string,
   Deps extends readonly unknown[] = unknown[],
   Return = unknown
 > = {
-  token: DIToken<Return>;
-  dependencies: DIFactoryFactoryTokenParams<Deps>;
+  token: DIToken<Return, Key>;
+  dependencies: DIFactoryFactoryTokenParams<Deps, string>;
   factory: (...args: Deps) => Return;
 };
 
@@ -45,7 +52,9 @@ export type DIFactory<
  * Represents the state of a DI container.
  * This is a record mapping DI tokens to their corresponding implementations.
  */
-export type DIContainerState = Record<DIToken<unknown>, unknown>;
+export type DIContainerState = {
+  [token: symbol]: unknown;
+};
 
 /**
  * Represents the state of a DI manager.
@@ -60,17 +69,19 @@ export type DIManagerState = {
  * Represents a Dependency Injection (DI) container.
  * A DI container is responsible for resolving dependencies.
  */
-export interface DIContainer {
+export interface DIContainer<State extends DIContainerState> {
   /**
    * Resolves a dependency or factory from the container.
    *
    * @param factory - The DI token or factory to resolve. Factories dependencies will be resolved recursively.
    * @returns The resolved dependency or factory function.
    */
-  resolve<Deps extends DIFactoryDependencies, Return = unknown>(
-    factory: DIFactory<Deps, Return>
-  ): Return;
-  resolve<T>(token: DIToken<T>): T;
+  // resolve<Deps extends DIFactoryDependencies, Return = unknown>(
+  //   factory: DIFactory<Deps, Return>
+  // ): Return;
+  resolve<T, Key extends string>(
+    token: DIToken<T, Key>
+  ): DIToken<T, Key> extends keyof State ? T : never;
 
   /**
    * Retrieves the current state of the container.
@@ -80,11 +91,16 @@ export interface DIContainer {
   getState(): DIContainerState;
 }
 
+type Merge<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
+type Registered<Token extends DIToken<T, Key>, T, Key extends string> = {
+  [K in Token]: T;
+};
+
 /**
  * Represents a builder for creating a DI container.
  * A DI container builder allows registering dependencies and factories.
  */
-export interface DIContainerBuilder {
+export interface DIContainerBuilder<DIState extends DIContainerState> {
   /**
    * Registers an implementation of an Interface/type in the container.
    *
@@ -92,7 +108,12 @@ export interface DIContainerBuilder {
    * @param value - The implementation or value of the dependency.
    * @returns The updated DIContainerBuilder instance.
    */
-  register<T>(token: DIToken<T>, value: T): DIContainerBuilder;
+  register<T, Key extends string>(
+    token: DIToken<T, Key> extends keyof DIState
+      ? "this token is already registered"
+      : DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
 
   /**
    * Registers a factory/use case in the container.
@@ -100,9 +121,17 @@ export interface DIContainerBuilder {
    * @param value - The DI factory to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerFactory<const Deps extends DIFactoryDependencies, Return = unknown>(
-    def: DIFactory<Deps, Return>
-  ): DIContainerBuilder;
+  registerFactory<
+    Key extends string,
+    const Deps extends DIFactoryDependencies,
+    Return = unknown
+  >(
+    def: DIToken<Return, Key> extends keyof DIState
+      ? "this token is already registered"
+      : DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder<
+    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
+  >;
 
   /**
    * Registers one or more factories/use cases in the container.
@@ -111,23 +140,23 @@ export interface DIContainerBuilder {
    * @returns The updated DIContainerBuilder instance.
    */
   registerFactoryArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIFactory<infer D, infer R>
+    [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
       ? T[K]
       : T[K] extends {
-          token: DIToken<unknown>;
+          token: DIToken<unknown, infer Key>;
           dependencies: unknown[];
           factory: (...args: infer Deps) => infer Res;
         }
-      ? DIFactory<Deps, Res>
-      : DIFactory;
-  }): DIContainerBuilder;
+      ? DIFactory<Key, Deps, Res>
+      : DIFactory<string>;
+  }): DIContainerBuilder<DIState>;
 
   /**
    * Finalizes the container and creates a static DIContainer instance.
    *
    * @returns The finalized DIContainer instance.
    */
-  getResult(): DIContainer;
+  getResult(): DIContainer<DIState>;
 }
 
 /**
@@ -142,7 +171,10 @@ export interface DIManagerBuilder {
    * @param key - The key to associate with the container (optional).
    * @returns The updated DIManagerBuilder instance.
    */
-  registerContainer(container: DIContainer, key?: string): DIManagerBuilder;
+  registerContainer(
+    container: DIContainer<any>,
+    key?: string
+  ): DIManagerBuilder;
 
   /**
    * Finalizes the manager and creates a static DIManager instance.
@@ -162,7 +194,7 @@ export interface DIManager {
    * @param key - The key of the container to retrieve (optional).
    * @returns The DIContainer instance associated with the key.
    */
-  getContainer(key?: string): DIContainer;
+  getContainer(key?: string): DIContainer<any>;
 
   /**
    * Sets the default container for the manager.

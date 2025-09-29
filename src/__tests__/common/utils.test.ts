@@ -8,12 +8,12 @@ import {
 interface RepoA {
   getFooA: () => string;
 }
-const RepoA = createDIToken<RepoA>("RepoA");
+const RepoA = createDIToken<RepoA>()("RepoA");
 
 interface RepoB {
   getFooB: () => string;
 }
-const RepoB = createDIToken<RepoB>("RepoB");
+const RepoB = createDIToken<RepoB>()("RepoB");
 
 describe("Dependency Injection Container", () => {
   it("should resolve implementations correctly", () => {
@@ -37,11 +37,11 @@ describe("Dependency Injection Container", () => {
       `Factory C depends on ${repoA.getFooA()}`;
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .registerFactory({
         token: factoryC,
@@ -65,9 +65,9 @@ describe("Dependency Injection Container", () => {
       }
     }
 
-    const factoryClassToken = createDIToken<FactoryClass>("factoryClass");
+    const factoryClassToken = createDIToken<FactoryClass>()("factoryClass");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .registerFactory({
         token: factoryClassToken,
@@ -90,12 +90,12 @@ describe("Dependency Injection Container", () => {
       `Factory D depends on ${repoA.getFooA()}`;
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
     const factoryD =
-      createDIToken<ReturnType<typeof factoryDFactory>>("factoryDToken");
+      createDIToken<ReturnType<typeof factoryDFactory>>()("factoryDToken");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .registerFactoryArray([
         {
@@ -129,12 +129,12 @@ describe("Dependency Injection Container", () => {
       )}]) depends on ${repoA.getFooA()}`;
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
     const factoryD =
-      createDIToken<ReturnType<typeof factoryDFactory>>("factoryDToken");
+      createDIToken<ReturnType<typeof factoryDFactory>>()("factoryDToken");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .registerFactoryArray([
         {
@@ -165,9 +165,9 @@ describe("Dependency Injection Container", () => {
         `Factory C (${arg1}, ${arg2}) depends on ${repoA.getFooA()} and ${repoB.getFooB()}`;
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .register(RepoB, repoBImpl)
       .registerFactoryArray([
@@ -191,14 +191,14 @@ describe("Dependency Injection Container", () => {
       `Factory D depends on ${c()}`;
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
     const factoryD =
-      createDIToken<ReturnType<typeof factoryDFactory>>("factoryDToken");
+      createDIToken<ReturnType<typeof factoryDFactory>>()("factoryDToken");
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .register(RepoA, repoAImpl)
       .registerFactoryArray([
         {
@@ -222,9 +222,9 @@ describe("Dependency Injection Container", () => {
     const factoryCFactory = (repoA: RepoA) => () => repoA.getFooA();
 
     const factory =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .registerFactory({
         token: factory,
         factory: factoryCFactory,
@@ -238,9 +238,9 @@ describe("Dependency Injection Container", () => {
   });
 
   it("should throw an error when resolving an unregistered token", () => {
-    const UnregisteredToken = createDIToken("UnregisteredToken");
+    const UnregisteredToken = createDIToken()("UnregisteredToken");
 
-    const container = buildDIContainer().getResult();
+    const container = buildDIContainer({}).getResult();
 
     expect(() => container.resolve(UnregisteredToken)).toThrowError(
       "Token Symbol(UnregisteredToken) not found"
@@ -254,12 +254,12 @@ describe("Dependency Injection Container", () => {
       c();
 
     const factoryD =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryDToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryDToken");
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>("factoryCToken");
+      createDIToken<ReturnType<typeof factoryCFactory>>()("factoryCToken");
 
-    const container = buildDIContainer()
+    const container = buildDIContainer({})
       .registerFactory({
         token: factoryC,
         factory: factoryCFactory,

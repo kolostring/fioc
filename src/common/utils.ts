@@ -2,7 +2,7 @@
  * This module provides utility functions for creating tokens, defining factories,
  * and building dependency injection containers and managers.
  */
-import { produce } from "immer";
+import { produce, WritableDraft } from "immer";
 import {
   DIContainerBuilder,
   DIContainerState,
@@ -11,7 +11,6 @@ import {
   DIToken,
   DIFactory,
   DIContainer,
-  DIFactoryDependencies,
   DIManagerBuilder,
 } from "./types";
 
@@ -22,8 +21,12 @@ import {
  * @param key - unique key for the token. Useful for debugging and serialization.
  * @returns A unique symbol representing the DI token carrying a type for casting purposes.
  */
-export function createDIToken<T>(key: string): DIToken<T> {
-  return Symbol.for(key) as DIToken<T>;
+export function createDIToken<T>(): <K extends string>(
+  key: K
+) => DIToken<T, K> {
+  return <K extends string>(key: K): DIToken<T, K> => {
+    return Symbol.for(key) as DIToken<T, K>;
+  };
 }
 
 /**
@@ -47,71 +50,88 @@ export function constructorToFactory<
  * @param containerState - The initial state of the container (optional).
  * @returns A DI container builder for registering dependencies and creating a static container.
  */
-export function buildDIContainer(
-  containerState: DIContainerState = {}
-): DIContainerBuilder {
-  const diContainer: DIContainerBuilder = {
-    register<T>(token: DIToken<T>, value: T): DIContainerBuilder {
-      const newState = produce(containerState, (draft) => {
-        draft[token] = value;
-        return draft;
-      });
+export function buildDIContainer<State extends DIContainerState>(
+  containerState: State
+): DIContainerBuilder<State> {
+  const diContainer: DIContainerBuilder<State> = {
+    register(token, value) {
+      if (token in containerState)
+        throw new Error(
+          `Token ${Symbol.keyFor(token as symbol)} already registered`
+        );
 
-      return buildDIContainer(newState);
-    },
-    registerFactory(value): DIContainerBuilder {
-      const newState = produce(containerState, (draft) => {
-        draft[value.token] = value;
-        return draft;
-      });
+      const newState = produce(
+        containerState,
+        (draft: WritableDraft<DIContainerState>) => {
+          draft[token as DIToken<typeof value, string>] = value;
+          return draft;
+        }
+      );
 
-      return buildDIContainer(newState);
+      return buildDIContainer(
+        newState as State & { [K in typeof token]: typeof value }
+      ) as unknown as ReturnType<DIContainerBuilder<State>["register"]>;
     },
-    registerFactoryArray<T extends readonly DIFactory[]>(
-      values: T
-    ): DIContainerBuilder {
-      const newState = produce(containerState, (draft) => {
-        values.forEach((value) => {
+    registerFactory(value) {
+      if (typeof value !== "object") {
+        throw new Error(`Factory must be an object. Got ${value} instead`);
+      }
+
+      if (value.token in containerState)
+        throw new Error(
+          `Token ${Symbol.keyFor(value.token as symbol)} already registered`
+        );
+
+      const newState = produce(
+        containerState,
+        (draft: WritableDraft<DIContainerState>) => {
           draft[value.token] = value;
-        });
-        return draft;
-      });
+          return draft;
+        }
+      );
+
+      return buildDIContainer(newState) as unknown as ReturnType<
+        DIContainerBuilder<State>["registerFactory"]
+      >;
+    },
+    registerFactoryArray<T extends readonly DIFactory<string>[]>(
+      values: T
+    ): DIContainerBuilder<State> {
+      const newState = produce(
+        containerState,
+        (draft: WritableDraft<DIContainerState>) => {
+          values.forEach((value) => {
+            draft[value.token] = value;
+          });
+          return draft;
+        }
+      );
 
       return buildDIContainer(newState);
     },
-    getResult(): DIContainer {
-      const diContainer: DIContainer = {
+    getResult(): DIContainer<State> {
+      const diContainer: DIContainer<State> = {
         getState: () => containerState,
-        resolve: (
-          factory: DIFactory<DIFactoryDependencies, unknown> | DIToken<unknown>
-        ) => {
-          if (typeof factory === "symbol") {
-            const token = factory;
+        resolve: <T, Key extends string>(toResolve: DIToken<unknown, Key>) => {
+          const token = toResolve;
 
-            if (!(token in containerState))
-              throw new Error(
-                `Could not Resolve: Token Symbol(${Symbol.keyFor(
-                  token
-                )}) not found`
-              );
-            const state = containerState[token];
-
-            if (!(state as DIFactory).dependencies) {
-              return state as () => unknown;
-            }
-
-            return (state as DIFactory).factory(
-              ...(state as DIFactory).dependencies.map(
-                (dep: DIToken<unknown>) => diContainer.resolve(dep)
-              )
+          if (!(token in containerState))
+            throw new Error(
+              `Could not Resolve: Token Symbol(${Symbol.keyFor(
+                token
+              )}) not found`
             );
-          } else {
-            return factory.factory(
-              ...factory.dependencies.map((dep: DIToken<unknown>) =>
-                diContainer.resolve(dep)
-              )
-            );
+          const state = containerState[token];
+
+          if (!(state as DIFactory<Key>).dependencies) {
+            return state as T;
           }
+
+          return (state as DIFactory<Key>).factory(
+            ...(state as DIFactory<Key>).dependencies.map(
+              (dep: DIToken<unknown, string>) => diContainer.resolve(dep)
+            )
+          ) as T;
         },
       };
 
