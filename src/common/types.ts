@@ -96,6 +96,22 @@ type Registered<Token extends DIToken<T, Key>, T, Key extends string> = {
   [K in Token]: T;
 };
 
+type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
+  x: infer I
+) => any
+  ? I
+  : never;
+
+type StateFromFactories<T extends readonly unknown[]> = Merge<
+  UnionToIntersection<
+    {
+      [K in keyof T]: T[K] extends DIFactory<infer Key, any, infer R>
+        ? Registered<DIToken<R, Key>, R, Key>
+        : never;
+    }[number]
+  >
+>;
+
 /**
  * Represents a builder for creating a DI container.
  * A DI container builder allows registering dependencies and factories.
@@ -149,7 +165,7 @@ export interface DIContainerBuilder<DIState extends DIContainerState> {
         }
       ? DIFactory<Key, Deps, Res>
       : DIFactory<string>;
-  }): DIContainerBuilder<DIState>;
+  }): DIContainerBuilder<DIState & StateFromFactories<T>>;
 
   /**
    * Finalizes the container and creates a static DIContainer instance.
