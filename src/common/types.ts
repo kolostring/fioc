@@ -73,6 +73,7 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
   /**
    * Resolves a dependency or factory from the container.
    *
+   * @throws Error if the token is not registered.
    * @param factory - The DI token or factory to resolve. Factories dependencies will be resolved recursively.
    * @returns The resolved dependency or factory function.
    */
@@ -84,7 +85,7 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
   ): DIToken<T, Key> extends keyof State ? T : never;
 
   /**
-   * Retrieves the current state of the container.
+   * Retrieves the current state of the container. Useful for merging with other containers.
    *
    * @returns The DIContainerState.
    */
@@ -120,29 +121,21 @@ export interface DIContainerBuilder<
   DIState extends DIContainerState<D>,
   D = unknown
 > {
+  /**
+   * Merges the current state of the container with the state of another container.
+   *
+   * @param containerState - The state to merge with the current state.
+   * @returns The updated DIContainerBuilder instance.
+   */
   merge<MD extends DIContainerState<any>>(
     containerState: MD
   ): DIContainerBuilder<Merge<DIState & MD>>;
 
-  overwrite<T, Key extends string>(
-    token: DIToken<T, Key>,
-    value: T
-  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
-
-  overwriteFactory<
-    Key extends string,
-    const Deps extends DIFactoryDependencies,
-    Return = unknown
-  >(
-    def: DIFactory<Key, Deps, Return>
-  ): DIContainerBuilder<
-    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
-  >;
-
   /**
    * Registers an implementation of an Interface/type in the container.
    *
-   * @param token - The DI token representing the dependency.
+   * @throws Error if the token is already registered.
+   * @param token - The unregistered DI token representing the dependency.
    * @param value - The implementation or value of the dependency.
    * @returns The updated DIContainerBuilder instance.
    */
@@ -154,9 +147,22 @@ export interface DIContainerBuilder<
   ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
 
   /**
+   * Overwrites an implementation of an Interface/type in the container, if exists. Otherwise, it registers it.
+   *
+   * @param token - The DI token representing the dependency.
+   * @param value - The implementation or value of the dependency.
+   * @returns The updated DIContainerBuilder instance.
+   */
+  overwrite<T, Key extends string>(
+    token: DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+
+  /**
    * Registers a factory/use case in the container.
    *
-   * @param value - The DI factory to register.
+   * @throws Error if the token is already registered or the factory is not an object.
+   * @param value - The unregistered DI factory to register.
    * @returns The updated DIContainerBuilder instance.
    */
   registerFactory<
@@ -167,6 +173,23 @@ export interface DIContainerBuilder<
     def: DIToken<Return, Key> extends keyof DIState
       ? "this token is already registered"
       : DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder<
+    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
+  >;
+
+  /**
+   * Overwrites a factory/use case in the container, if exists. Otherwise, it registers it.
+   *
+   * @throws Error if the factory is not an object.
+   * @param value - The DI factory to register.
+   * @returns The updated DIContainerBuilder instance.
+   */
+  overwriteFactory<
+    Key extends string,
+    const Deps extends DIFactoryDependencies,
+    Return = unknown
+  >(
+    def: DIFactory<Key, Deps, Return>
   ): DIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;
