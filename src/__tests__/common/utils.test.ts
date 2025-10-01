@@ -97,7 +97,7 @@ describe("Dependency Injection Container", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactoryArray([
+      .overwriteFactoryArray([
         {
           token: factoryC,
           factory: factoryCFactory,
@@ -136,7 +136,7 @@ describe("Dependency Injection Container", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactoryArray([
+      .overwriteFactoryArray([
         {
           token: factoryC,
           factory: factoryCFactory,
@@ -170,7 +170,7 @@ describe("Dependency Injection Container", () => {
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .register(RepoB, repoBImpl)
-      .registerFactoryArray([
+      .overwriteFactoryArray([
         {
           token: factoryC,
           factory: factoryCFactory,
@@ -200,7 +200,7 @@ describe("Dependency Injection Container", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactoryArray([
+      .overwriteFactoryArray([
         {
           token: factoryC,
           factory: factoryCFactory,
@@ -318,5 +318,13 @@ describe("Dependency Injection Container", () => {
     expect(() => container.resolve(factoryD)).toThrowError(
       "Maximum call stack size exceeded"
     );
+  });
+
+  it("should throw an error on trying to redefine a token", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    expect(() =>
+      buildDIContainer().register(RepoA, repoAImpl).register(RepoA, repoAImpl)
+    ).toThrowError("Token Symbol(RepoA) already registered");
   });
 });

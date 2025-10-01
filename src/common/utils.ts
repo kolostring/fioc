@@ -60,9 +60,15 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
     register(token, value) {
       if (token in containerState)
         throw new Error(
-          `Token ${Symbol.keyFor(token as symbol)} already registered`
+          `Token Symbol(${Symbol.keyFor(token as symbol)}) already registered`
         );
 
+      return diContainer.overwrite(
+        token as unknown as DIToken<T, string>,
+        value as unknown
+      );
+    },
+    overwrite(token, value) {
       const newState = produce(containerState, (draft: any) => {
         draft[token as DIToken<typeof value, string>] = value;
         return draft;
@@ -79,8 +85,17 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
 
       if (value.token in containerState)
         throw new Error(
-          `Token ${Symbol.keyFor(value.token as symbol)} already registered`
+          `Token Symbol(${Symbol.keyFor(
+            value.token as symbol
+          )}) already registered`
         );
+
+      return diContainer.overwriteFactory(value);
+    },
+    overwriteFactory(value) {
+      if (typeof value !== "object") {
+        throw new Error(`Factory must be an object. Got ${value} instead`);
+      }
 
       const newState = produce(containerState, (draft: any) => {
         draft[value.token] = value;
@@ -89,7 +104,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
 
       return buildDIContainer(newState) as unknown as any;
     },
-    registerFactoryArray(values) {
+    overwriteFactoryArray(values) {
       const newState = produce(containerState, (draft: any) => {
         values.forEach((value) => {
           draft[value.token] = value;

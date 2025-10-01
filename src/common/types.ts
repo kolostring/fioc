@@ -124,6 +124,21 @@ export interface DIContainerBuilder<
     containerState: MD
   ): DIContainerBuilder<Merge<DIState & MD>>;
 
+  overwrite<T, Key extends string>(
+    token: DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+
+  overwriteFactory<
+    Key extends string,
+    const Deps extends DIFactoryDependencies,
+    Return = unknown
+  >(
+    def: DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder<
+    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
+  >;
+
   /**
    * Registers an implementation of an Interface/type in the container.
    *
@@ -162,7 +177,7 @@ export interface DIContainerBuilder<
    * @param values - The DI factory array to register.
    * @returns The updated DIContainerBuilder instance.
    */
-  registerFactoryArray<T extends readonly unknown[]>(values: {
+  overwriteFactoryArray<T extends readonly unknown[]>(values: {
     [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
       ? T[K]
       : T[K] extends {
