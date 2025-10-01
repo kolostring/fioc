@@ -21,11 +21,11 @@ import {
  * @param key - unique key for the token. Useful for debugging and serialization.
  * @returns A unique symbol representing the DI token carrying a type for casting purposes.
  */
-export function createDIToken<T>(): <K extends string>(
-  key: K
-) => DIToken<T, K> {
-  return <K extends string>(key: K): DIToken<T, K> => {
-    return Symbol.for(key) as DIToken<T, K>;
+export function createDIToken<T>() {
+  return {
+    as: <K extends string>(key: K): DIToken<T, K> => {
+      return Symbol.for(key) as DIToken<T, K>;
+    },
   };
 }
 
@@ -90,13 +90,9 @@ export function buildDIContainer<State extends DIContainerState>(
         }
       );
 
-      return buildDIContainer(newState) as unknown as ReturnType<
-        DIContainerBuilder<State>["registerFactory"]
-      >;
+      return buildDIContainer(newState) as unknown as any;
     },
-    registerFactoryArray<T extends readonly DIFactory<string>[]>(
-      values: T
-    ): DIContainerBuilder<State> {
+    registerFactoryArray(values) {
       const newState = produce(
         containerState,
         (draft: WritableDraft<DIContainerState>) => {
@@ -107,7 +103,7 @@ export function buildDIContainer<State extends DIContainerState>(
         }
       );
 
-      return buildDIContainer(newState);
+      return buildDIContainer(newState) as unknown as any;
     },
     getResult(): DIContainer<State> {
       const diContainer: DIContainer<State> = {
