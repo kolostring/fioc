@@ -34,9 +34,6 @@ export type DIFactoryFactoryTokenParams<
 
 /**
  * Represents a DI factory, which is a function factory that depends on interface implementations or other factories.
- *
- * @typeParam Deps - The dependencies of the factory.
- * @typeParam Return - The return type of the factory resolved function.
  */
 export type DIFactory<
   Key extends string,
@@ -44,7 +41,7 @@ export type DIFactory<
   Return = unknown
 > = {
   token: DIToken<Return, Key>;
-  dependencies: DIFactoryFactoryTokenParams<Deps, string>;
+  dependencies: { [K in keyof Deps]: DIToken<Deps[K], string> };
   factory: (...args: Deps) => Return;
 };
 
@@ -161,18 +158,22 @@ export interface DIContainerBuilder<
   /**
    * Registers a factory/use case in the container.
    *
-   * @throws Error if the token is already registered or the factory is not an object.
+   * @throws Error if the token is already registered, if the factory is not an object or if a dependency is not registered.
    * @param value - The unregistered DI factory to register.
    * @returns The updated DIContainerBuilder instance.
    */
   registerFactory<
     Key extends string,
-    const Deps extends DIFactoryDependencies,
+    const Deps extends readonly unknown[],
     Return = unknown
   >(
     def: DIToken<Return, Key> extends keyof DIState
       ? "this token is already registered"
-      : DIFactory<Key, Deps, Return>
+      : DIFactory<Key, Deps, Return> & {
+          dependencies: {
+            [K in keyof Deps]: DIToken<Deps[K], string> & keyof DIState;
+          };
+        }
   ): DIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;

@@ -79,16 +79,26 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
       ) as unknown as ReturnType<DIContainerBuilder<State>["register"]>;
     },
     registerFactory(value) {
-      if (typeof value !== "object") {
+      if (typeof value !== "object" || !value) {
         throw new Error(`Factory must be an object. Got ${value} instead`);
       }
 
-      if (value.token in containerState)
+      const { token, dependencies } = value;
+
+      if (token in containerState) {
         throw new Error(
-          `Token Symbol(${Symbol.keyFor(
-            value.token as symbol
-          )}) already registered`
+          `Token Symbol(${Symbol.keyFor(token as symbol)}) already registered`
         );
+      }
+
+      // Verify all dependencies are registered
+      for (const dep of dependencies) {
+        if (!(dep in containerState)) {
+          throw new Error(
+            `Dependency Symbol(${Symbol.keyFor(dep as symbol)}) not registered`
+          );
+        }
+      }
 
       return diContainer.overwriteFactory(value);
     },
