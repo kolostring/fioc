@@ -52,8 +52,8 @@ export type DIFactory<
  * Represents the state of a DI container.
  * This is a record mapping DI tokens to their corresponding implementations.
  */
-export type DIContainerState = {
-  [token: symbol]: unknown;
+export type DIContainerState<T = unknown[]> = {
+  [K in keyof T]: K extends DIToken<infer U, string> ? U : never;
 };
 
 /**
@@ -69,7 +69,7 @@ export type DIManagerState = {
  * Represents a Dependency Injection (DI) container.
  * A DI container is responsible for resolving dependencies.
  */
-export interface DIContainer<State extends DIContainerState> {
+export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
   /**
    * Resolves a dependency or factory from the container.
    *
@@ -88,7 +88,7 @@ export interface DIContainer<State extends DIContainerState> {
    *
    * @returns The DIContainerState.
    */
-  getState(): DIContainerState;
+  getState(): State;
 }
 
 type Merge<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
@@ -116,7 +116,10 @@ type StateFromFactories<T extends readonly unknown[]> = Merge<
  * Represents a builder for creating a DI container.
  * A DI container builder allows registering dependencies and factories.
  */
-export interface DIContainerBuilder<DIState extends DIContainerState> {
+export interface DIContainerBuilder<
+  DIState extends DIContainerState<D>,
+  D = unknown
+> {
   /**
    * Registers an implementation of an Interface/type in the container.
    *

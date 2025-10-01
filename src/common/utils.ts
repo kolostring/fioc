@@ -2,7 +2,7 @@
  * This module provides utility functions for creating tokens, defining factories,
  * and building dependency injection containers and managers.
  */
-import { produce, WritableDraft } from "immer";
+import { produce } from "immer";
 import {
   DIContainerBuilder,
   DIContainerState,
@@ -50,8 +50,8 @@ export function constructorToFactory<
  * @param containerState - The initial state of the container (optional).
  * @returns A DI container builder for registering dependencies and creating a static container.
  */
-export function buildDIContainer<State extends DIContainerState>(
-  containerState: State
+export function buildDIContainer<State extends DIContainerState<T>, T>(
+  containerState: State = {} as State
 ): DIContainerBuilder<State> {
   const diContainer: DIContainerBuilder<State> = {
     register(token, value) {
@@ -60,13 +60,10 @@ export function buildDIContainer<State extends DIContainerState>(
           `Token ${Symbol.keyFor(token as symbol)} already registered`
         );
 
-      const newState = produce(
-        containerState,
-        (draft: WritableDraft<DIContainerState>) => {
-          draft[token as DIToken<typeof value, string>] = value;
-          return draft;
-        }
-      );
+      const newState = produce(containerState, (draft: any) => {
+        draft[token as DIToken<typeof value, string>] = value;
+        return draft;
+      });
 
       return buildDIContainer(
         newState as State & { [K in typeof token]: typeof value }
@@ -82,26 +79,20 @@ export function buildDIContainer<State extends DIContainerState>(
           `Token ${Symbol.keyFor(value.token as symbol)} already registered`
         );
 
-      const newState = produce(
-        containerState,
-        (draft: WritableDraft<DIContainerState>) => {
-          draft[value.token] = value;
-          return draft;
-        }
-      );
+      const newState = produce(containerState, (draft: any) => {
+        draft[value.token] = value;
+        return draft;
+      });
 
       return buildDIContainer(newState) as unknown as any;
     },
     registerFactoryArray(values) {
-      const newState = produce(
-        containerState,
-        (draft: WritableDraft<DIContainerState>) => {
-          values.forEach((value) => {
-            draft[value.token] = value;
-          });
-          return draft;
-        }
-      );
+      const newState = produce(containerState, (draft: any) => {
+        values.forEach((value) => {
+          draft[value.token] = value;
+        });
+        return draft;
+      });
 
       return buildDIContainer(newState) as unknown as any;
     },
@@ -117,7 +108,7 @@ export function buildDIContainer<State extends DIContainerState>(
                 token
               )}) not found`
             );
-          const state = containerState[token];
+          const state = (containerState as any)[token];
 
           if (!(state as DIFactory<Key>).dependencies) {
             return state as T;
