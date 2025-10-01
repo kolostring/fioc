@@ -218,6 +218,49 @@ describe("Dependency Injection Container", () => {
     expect(resolvedA).toBe("Factory D depends on Factory C depends on A");
   });
 
+  it("should merge states", () => {
+    const factoryCFactory = (repoA: RepoA) => () =>
+      `Factory C depends on ${repoA.getFooA()}`;
+
+    const factoryDFactory = (c: ReturnType<typeof factoryCFactory>) => () =>
+      `Factory D depends on ${c()}`;
+
+    const factoryC =
+      createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
+
+    const factoryD =
+      createDIToken<ReturnType<typeof factoryDFactory>>().as("factoryDToken");
+
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const containerA = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .getResult();
+    const containerC = buildDIContainer()
+      .registerFactory({
+        token: factoryC,
+        factory: factoryCFactory,
+        dependencies: [RepoA],
+      })
+      .getResult();
+    const containerD = buildDIContainer()
+      .registerFactory({
+        token: factoryD,
+        factory: factoryDFactory,
+        dependencies: [factoryC],
+      })
+      .getResult();
+
+    const container = buildDIContainer()
+      .merge(containerA.getState())
+      .merge(containerC.getState())
+      .merge(containerD.getState())
+      .getResult();
+
+    const resolvedA = container.resolve(factoryD)();
+    expect(resolvedA).toBe("Factory D depends on Factory C depends on A");
+  });
+
   it("should throw an error for missing dependencies", () => {
     const factoryCFactory = (repoA: RepoA) => () => repoA.getFooA();
 

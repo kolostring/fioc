@@ -120,6 +120,10 @@ export interface DIContainerBuilder<
   DIState extends DIContainerState<D>,
   D = unknown
 > {
+  merge<MD extends DIContainerState<any>>(
+    containerState: MD
+  ): DIContainerBuilder<Merge<DIState & MD>>;
+
   /**
    * Registers an implementation of an Interface/type in the container.
    *

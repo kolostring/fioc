@@ -54,6 +54,9 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
   containerState: State = {} as State
 ): DIContainerBuilder<State> {
   const diContainer: DIContainerBuilder<State> = {
+    merge(stateToMerge) {
+      return buildDIContainer({ ...containerState, ...stateToMerge }) as any;
+    },
     register(token, value) {
       if (token in containerState)
         throw new Error(
