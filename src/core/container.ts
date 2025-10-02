@@ -1,46 +1,121 @@
-/**
- * This module provides utility functions for creating tokens, defining factories,
- * and building dependency injection containers and managers.
- */
 import { produce } from "immer";
-import {
-  DIContainerBuilder,
-  DIContainerState,
-  DIManager,
-  DIManagerState,
-  DIToken,
-  DIFactory,
-  DIContainer,
-  DIManagerBuilder,
-} from "./types";
+import { DIFactory, DIFactoryDependencies } from "./factory";
+import { DIToken } from "./token";
 
 /**
- * Creates a Dependency Injection (DI) token.
- * Tokens are unique symbols used to identify dependencies in the DI container carrying a type for casting purposes.
- *
- * @param key - unique key for the token. Useful for debugging and serialization.
- * @returns A unique symbol representing the DI token carrying a type for casting purposes.
+ * Represents the state of a DI container.
+ * This is a record mapping DI tokens to their corresponding implementations.
  */
-export function createDIToken<T>() {
-  return {
-    as: <K extends string>(key: K): DIToken<T, K> => {
-      return Symbol.for(key) as DIToken<T, K>;
-    },
-  };
+export type DIContainerState<T = unknown[]> = {
+  [K in keyof T]: K extends DIToken<infer U, string> ? U : never;
+};
+
+type Merge<T> = T extends infer O ? { [K in keyof O]: O[K] } : never;
+type Registered<Token extends DIToken<T, Key>, T, Key extends string> = {
+  [K in Token]: T;
+};
+
+type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
+  x: infer I
+) => any
+  ? I
+  : never;
+
+type StateFromFactories<T extends readonly unknown[]> = Merge<
+  UnionToIntersection<
+    {
+      [K in keyof T]: T[K] extends DIFactory<infer Key, any, infer R>
+        ? Registered<DIToken<R, Key>, R, Key>
+        : never;
+    }[number]
+  >
+>;
+
+/**
+ * Represents a Dependency Injection (DI) container.
+ * A DI container is responsible for resolving dependencies.
+ */
+export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
+  /**
+   * Resolves a dependency or factory from the container.
+   *
+   * @throws Error if the token is not registered.
+   * @param token - The DI token to resolve.
+   * @returns The resolved dependency.
+   */
+  resolve<T, Key extends string>(
+    token: DIToken<T, Key>
+  ): DIToken<T, Key> extends keyof State ? T : never;
+
+  /**
+   * Retrieves the current state of the container. Useful for merging with other containers.
+   *
+   * @returns The DIContainerState.
+   */
+  getState(): State;
 }
 
 /**
- * Converts a class constructor to a factory function.
- * This is useful for creating factories out of classes.
- *
- * @param Ctor - The class constructor to convert.
- * @returns A factory function that creates instances of the class.
+ * Represents a builder for creating a DI container.
+ * A DI container builder allows registering dependencies and factories.
  */
-export function constructorToFactory<
-  Args extends any[],
-  C extends new (...args: Args) => any
->(Ctor: C): (...args: ConstructorParameters<C>) => InstanceType<C> {
-  return (...args) => new Ctor(...args);
+export interface DIContainerBuilder<
+  DIState extends DIContainerState<D>,
+  D = unknown
+> {
+  merge<MD extends DIContainerState<any>>(
+    containerState: MD
+  ): DIContainerBuilder<Merge<DIState & MD>>;
+
+  register<T, Key extends string>(
+    token: DIToken<T, Key> extends keyof DIState
+      ? "this token is already registered"
+      : DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+
+  overwrite<T, Key extends string>(
+    token: DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+
+  registerFactory<
+    Key extends string,
+    Deps extends readonly any[],
+    Return = unknown
+  >(
+    def: DIToken<Return, Key> extends keyof DIState
+      ? "This token is already registered"
+      : Extract<keyof DIState, DIToken<Deps[number], string>> extends never
+      ? "One or more dependencies are not registered in the container"
+      : DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder<
+    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
+  >;
+
+  overwriteFactory<
+    Key extends string,
+    const Deps extends DIFactoryDependencies,
+    Return = unknown
+  >(
+    def: DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder<
+    Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
+  >;
+
+  overwriteFactoryArray<T extends readonly unknown[]>(values: {
+    [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
+      ? T[K]
+      : T[K] extends {
+          token: DIToken<unknown, infer Key>;
+          dependencies: unknown[];
+          factory: (...args: infer Deps) => infer Res;
+        }
+      ? DIFactory<Key, Deps, Res>
+      : DIFactory<string>;
+  }): DIContainerBuilder<DIState & StateFromFactories<T>>;
+
+  getResult(): DIContainer<DIState>;
 }
 
 /**
@@ -155,62 +230,4 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
   };
 
   return diContainer;
-}
-
-/**
- * Builds a Dependency Injection (DI) container manager.
- * The manager allows managing multiple containers and switching between them.
- *
- * @param containerManagerState - The initial state of the manager (optional).
- * @returns A DI manager for managing containers and their states.
- */
-export function buildDIContainerManager(
-  containerManagerState: DIManagerState = {
-    containers: {},
-    currentContainer: "default",
-  }
-): DIManagerBuilder {
-  const { containers, currentContainer } = containerManagerState;
-
-  const diManagerBuilder: DIManagerBuilder = {
-    registerContainer(container, key: string = "default") {
-      if (containers[key]) throw new Error(`Container ${key} already exists`);
-      const newContainersState = produce(containers, (draft) => {
-        draft[key] = container.getState();
-        return draft;
-      });
-      return buildDIContainerManager({
-        containers: newContainersState,
-        currentContainer,
-      });
-    },
-    getResult(): DIManager {
-      const diManager: DIManager = {
-        getContainer(key: string | undefined) {
-          if (!containers[key ?? currentContainer])
-            throw new Error("Container not found");
-          return buildDIContainer(
-            containers[key ?? currentContainer]
-          ).getResult();
-        },
-        setDefaultContainer(key: string) {
-          if (!(key in containers)) {
-            throw new Error(`Container ${key} not found`);
-          }
-
-          return buildDIContainerManager({
-            ...containerManagerState,
-            currentContainer: key,
-          }).getResult();
-        },
-        getState() {
-          return containerManagerState;
-        },
-      };
-
-      return diManager;
-    },
-  };
-
-  return diManagerBuilder;
 }
