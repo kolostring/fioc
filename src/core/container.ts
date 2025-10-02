@@ -1,5 +1,5 @@
 import { produce } from "immer";
-import { DIFactory, DIFactoryDependencies } from "./factory";
+import { DIFactory } from "./factory";
 import { DIToken } from "./token";
 
 /**
@@ -219,7 +219,7 @@ export interface StrictDIContainerBuilder<
    */
   replaceFactory<
     Key extends string,
-    const Deps extends DIFactoryDependencies,
+    Deps extends readonly any[],
     Return = unknown
   >(
     def: DIFactory<Key, Deps, Return>
@@ -330,7 +330,7 @@ export interface DIContainerBuilder {
    */
   registerFactory<
     Key extends string,
-    const Deps extends DIFactoryDependencies,
+    Deps extends readonly any[],
     Return = unknown
   >(
     def: DIFactory<Key, Deps, Return>

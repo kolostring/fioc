@@ -7,19 +7,6 @@ import { DIToken } from "./token";
 export type DIFactoryDependencies = readonly DIToken<any, string>[];
 
 /**
- * Represents the factory parameters for a DI factory.
- *
- * @template Deps - The dependencies of the DI factory.
- * @template Key - The string literal type for the token key.
- */
-export type DIFactoryFactoryTokenParams<
-  Deps extends readonly unknown[],
-  Key extends string
-> = {
-  [K in keyof Deps]: DIToken<Deps[K], Key>;
-};
-
-/**
  * Represents a factory definition in the DI container.
  * Factories are used to create instances that depend on other registered services.
  *
