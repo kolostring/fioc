@@ -37,11 +37,11 @@ export type DIFactoryFactoryTokenParams<
  */
 export type DIFactory<
   Key extends string,
-  Deps extends readonly unknown[] = unknown[],
+  Deps extends readonly any[] = any[],
   Return = unknown
 > = {
   token: DIToken<Return, Key>;
-  dependencies: { [K in keyof Deps]: DIToken<Deps[K], string> };
+  dependencies: { [P in keyof Deps]: DIToken<Deps[P], string> };
   factory: (...args: Deps) => Return;
 };
 
@@ -164,16 +164,14 @@ export interface DIContainerBuilder<
    */
   registerFactory<
     Key extends string,
-    const Deps extends readonly unknown[],
+    Deps extends readonly any[],
     Return = unknown
   >(
     def: DIToken<Return, Key> extends keyof DIState
-      ? "this token is already registered"
-      : DIFactory<Key, Deps, Return> & {
-          dependencies: {
-            [K in keyof Deps]: DIToken<Deps[K], string> & keyof DIState;
-          };
-        }
+      ? "This token is already registered"
+      : Extract<keyof DIState, DIToken<Deps[number], string>> extends never
+      ? "One or more dependencies are not registered in the container"
+      : DIFactory<Key, Deps, Return>
   ): DIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;

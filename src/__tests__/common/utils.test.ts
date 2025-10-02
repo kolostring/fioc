@@ -120,13 +120,12 @@ describe("Dependency Injection Container", () => {
   it("should register factory arrays with variable function parameters", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
+    const joinArgs = (args: string[]) => args.join(", ");
     const factoryCFactory = (repoA: RepoA) => (arg1: string, arg2: number) =>
       `Factory C (${arg1}, ${arg2}) depends on ${repoA.getFooA()}`;
 
     const factoryDFactory = (repoA: RepoA) => (arg: string[]) =>
-      `Factory D ([${arg.reduce(
-        (acc, cur) => `${acc}, ${cur}`
-      )}]) depends on ${repoA.getFooA()}`;
+      `Factory D ([${joinArgs(arg)}]) depends on ${repoA.getFooA()}`;
 
     const factoryC =
       createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
@@ -237,13 +236,12 @@ describe("Dependency Injection Container", () => {
       .register(RepoA, repoAImpl)
       .getResult();
     const containerC = buildDIContainer()
+      .register(RepoA, repoAImpl)
       .registerFactory({
         token: factoryC,
         factory: factoryCFactory,
         dependencies: [RepoA],
       })
-      .getResult();
-    const containerD = buildDIContainer()
       .registerFactory({
         token: factoryD,
         factory: factoryDFactory,
@@ -254,7 +252,6 @@ describe("Dependency Injection Container", () => {
     const container = buildDIContainer()
       .merge(containerA.getState())
       .merge(containerC.getState())
-      .merge(containerD.getState())
       .getResult();
 
     const resolvedA = container.resolve(factoryD)();
@@ -268,11 +265,14 @@ describe("Dependency Injection Container", () => {
       createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
 
     const container = buildDIContainer()
-      .registerFactory({
-        token: factory,
-        factory: factoryCFactory,
-        dependencies: [RepoA],
-      })
+      .registerFactory(
+        //@ts-expect-error - Testing missing dependencies
+        {
+          token: factory,
+          factory: factoryCFactory,
+          dependencies: [RepoA],
+        }
+      )
       .getResult();
 
     expect(() => container.resolve(factory)).toThrowError(
@@ -303,16 +303,22 @@ describe("Dependency Injection Container", () => {
       createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
 
     const container = buildDIContainer()
-      .registerFactory({
-        token: factoryC,
-        factory: factoryCFactory,
-        dependencies: [factoryD],
-      })
-      .registerFactory({
-        token: factoryD,
-        factory: factoryDFactory,
-        dependencies: [factoryC],
-      })
+      .registerFactory(
+        //@ts-expect-error - Testing circular dependencies
+        {
+          token: factoryC,
+          factory: factoryCFactory,
+          dependencies: [factoryD],
+        }
+      )
+      .registerFactory(
+        //@ts-expect-error - Testing circular dependencies
+        {
+          token: factoryD,
+          factory: factoryDFactory,
+          dependencies: [factoryC],
+        }
+      )
       .getResult();
 
     expect(() => container.resolve(factoryD)).toThrowError(
@@ -324,7 +330,10 @@ describe("Dependency Injection Container", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     expect(() =>
-      buildDIContainer().register(RepoA, repoAImpl).register(RepoA, repoAImpl)
+      buildDIContainer()
+        .register(RepoA, repoAImpl)
+        // @ts-expect-error - Testing that redefining a token fails at runtime
+        .register(RepoA, repoAImpl)
     ).toThrowError("Token Symbol(RepoA) already registered");
   });
 });
