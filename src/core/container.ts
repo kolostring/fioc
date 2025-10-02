@@ -5,6 +5,7 @@ import { DIToken } from "./token";
 /**
  * Represents the state of a DI container.
  * This is a record mapping DI tokens to their corresponding implementations.
+ * @template T - Array type containing the dependencies
  */
 export type DIContainerState<T = unknown[]> = {
   [K in keyof T]: K extends DIToken<infer U, string> ? U : never;
@@ -32,41 +33,114 @@ type StateFromFactories<T extends readonly unknown[]> = Merge<
 >;
 
 /**
- * Represents a Dependency Injection (DI) container.
- * A DI container is responsible for resolving dependencies.
+ * Core interface for a Dependency Injection (DI) container.
+ * A DI container is responsible for managing and resolving dependencies at runtime.
+ *
+ * @template State - The type representing the container's state
+ * @template D - The type of dependencies managed by the container
  */
 export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
   /**
    * Resolves a dependency or factory from the container.
+   * For simple values, returns the registered value.
+   * For factories, resolves all dependencies and returns the factory result.
    *
-   * @throws Error if the token is not registered.
-   * @param token - The DI token to resolve.
-   * @returns The resolved dependency.
+   * @throws Error if the token is not registered or if any factory dependency is missing
+   * @param token - The DI token to resolve
+   * @returns The resolved dependency of type T
+   *
+   * @example
+   * ```typescript
+   * // Resolve a simple value
+   * const api = container.resolve(ApiServiceToken);
+   *
+   * // Resolve a factory (automatically resolves dependencies)
+   * const useCase = container.resolve(UseCaseToken);
+   * ```
    */
   resolve<T, Key extends string>(
     token: DIToken<T, Key>
   ): DIToken<T, Key> extends keyof State ? T : never;
 
   /**
-   * Retrieves the current state of the container. Useful for merging with other containers.
+   * Retrieves the current state of the container.
+   * Useful for merging containers or inspecting the container state.
    *
-   * @returns The DIContainerState.
+   * @returns The complete DIContainerState
+   * @example
+   * ```typescript
+   * const state = container.getState();
+   * const newContainer = buildDIContainer().merge(state);
+   * ```
    */
   getState(): State;
 }
 
 /**
- * Represents a builder for creating an strict DI container.
- * A DI container builder allows registering dependencies and factories, and is strict in its type checking.
+ * Builder interface for creating a strictly-typed DI container.
+ * Provides compile-time validation of dependency registration and resolution.
+ *
+ * The strict builder ensures:
+ * - No duplicate registrations
+ * - All factory dependencies exist
+ * - Type-safe dependency resolution
+ *
+ * @template DIState - The current state type of the container
+ * @template D - The type of dependencies managed by the container
+ *
+ * @example
+ * ```typescript
+ * const container = buildStrictDIContainer()
+ *   // Type error if ApiServiceToken is already registered
+ *   .register(ApiServiceToken, new HttpApiService())
+ *
+ *   // Type error if dependencies are not registered
+ *   .registerFactory({
+ *     token: UseCaseToken,
+ *     dependencies: [ApiServiceToken],
+ *     factory: UseCaseFactory
+ *   })
+ *   .getResult();
+ * ```
  */
 export interface StrictDIContainerBuilder<
   DIState extends DIContainerState<D>,
   D = unknown
 > {
+  /**
+   * Merges another container's state into this container.
+   * Useful for combining multiple container configurations.
+   *
+   * @param containerState - The state to merge
+   * @returns A new builder with the merged state
+   *
+   * @example
+   * ```typescript
+   * const combined = baseContainer
+   *   .merge(featureContainer.getState())
+   *   .getResult();
+   * ```
+   */
   merge<MD extends DIContainerState<any>>(
     containerState: MD
   ): StrictDIContainerBuilder<Merge<DIState & MD>>;
 
+  /**
+   * Registers a new value with strict type checking.
+   * Will fail at compile-time if the token is already registered.
+   *
+   * @param token - The token to register (must not exist in container)
+   * @param value - The value to register
+   * @returns A new builder with the registered value
+   * @throws Compile-time error if token is already registered
+   *
+   * @example
+   * ```typescript
+   * container.register(ApiServiceToken, HttpApiService)
+   * // Error: Token already registered
+   * container.register(ApiServiceToken, MockApiService)
+   * ```
+   */
   register<T, Key extends string>(
     token: DIToken<T, Key> extends keyof DIState
       ? "this token is already registered"
@@ -76,13 +150,43 @@ export interface StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<T, Key>, T, Key>>
   >;
 
-  overwrite<T, Key extends string>(
+  /**
+   * Safely replaces an existing registration.
+   * Useful for testing or changing implementations at runtime.
+   *
+   * @param token - The token to replace
+   * @param value - The new value
+   * @returns A new builder with the replaced value
+   *
+   * @example
+   * ```typescript
+   * container.replace(ApiServiceToken, MockApiService)
+   * ```
+   */
+  replace<T, Key extends string>(
     token: DIToken<T, Key>,
     value: T
   ): StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<T, Key>, T, Key>>
   >;
 
+  /**
+   * Registers a new factory with strict dependency checking.
+   * Validates at compile-time that all dependencies exist.
+   *
+   * @param def - The factory definition
+   * @returns A new builder with the registered factory
+   * @throws Compile-time error if token exists or dependencies are missing
+   *
+   * @example
+   * ```typescript
+   * container.registerFactory({
+   *   token: UseCaseToken,
+   *   dependencies: [ApiServiceToken], // Type error if ApiServiceToken not registered or dependencies don't match factory params
+   *   factory: UseCaseFactory
+   * })
+   * ```
+   */
   registerFactory<
     Key extends string,
     Deps extends readonly any[],
@@ -97,7 +201,23 @@ export interface StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;
 
-  overwriteFactory<
+  /**
+   * Replaces an existing factory registration.
+   * Useful for testing or changing factory implementations.
+   *
+   * @param def - The new factory definition
+   * @returns A new builder with the replaced factory
+   *
+   * @example
+   * ```typescript
+   * container.replaceFactory({
+   *   token: UseCaseToken,
+   *   dependencies: [MockApiToken],
+   *   factory: UseCaseFactory
+   * })
+   * ```
+   */
+  replaceFactory<
     Key extends string,
     const Deps extends DIFactoryDependencies,
     Return = unknown
@@ -107,7 +227,30 @@ export interface StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;
 
-  overwriteFactoryArray<T extends readonly unknown[]>(values: {
+  /**
+   * Replaces multiple factories at once.
+   * Useful for bulk updates of factory implementations.
+   *
+   * @param values - Array of factory definitions to replace
+   * @returns A new builder with all factories replaced
+   *
+   * @example
+   * ```typescript
+   * container.replaceFactoryArray([
+   *   {
+   *     token: UseCaseToken,
+   *     dependencies: [MockApiToken],
+   *     factory: UseCaseFactory
+   *   },
+   *   {
+   *     token: OtherUseCaseToken,
+   *     dependencies: [MockApiToken],
+   *     factory: OtherUseCaseFactory
+   *   }
+   * ])
+   * ```
+   */
+  replaceFactoryArray<T extends readonly unknown[]>(values: {
     [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
       ? T[K]
       : T[K] extends {
@@ -119,6 +262,17 @@ export interface StrictDIContainerBuilder<
       : DIFactory<string>;
   }): StrictDIContainerBuilder<DIState & StateFromFactories<T>>;
 
+  /**
+   * Finalizes the builder and returns an immutable container.
+   *
+   * @returns A DIContainer instance with the registered dependencies
+   *
+   * @example
+   * ```typescript
+   * const container = builder.getResult();
+   * const api = container.resolve(ApiServiceToken);
+   * ```
+   */
   getResult(): DIContainer<DIState>;
 }
 
@@ -127,16 +281,54 @@ export interface StrictDIContainerBuilder<
  * A DI container builder allows registering dependencies and factories.
  */
 export interface DIContainerBuilder {
+  /**
+   * Merges the current state of the container with the state of another container.
+   *
+   * @param containerState - The state to merge with the current state.
+   * @returns The updated DIContainerBuilder instance.
+   * @example
+   * ```typescript
+   * const combined = baseContainer
+   *   .merge(featureContainer.getState())
+   *   .getResult();
+   * ```
+   */
   merge<MD extends DIContainerState<any>>(
     containerState: MD
   ): DIContainerBuilder;
 
-  overwrite<T, Key extends string>(
+  /**
+   * Registers a new value with the specified token. Will replace any existing value for the token.
+   *
+   * @param token - The token to register the value with.
+   * @param value - The value to register.
+   * @returns The updated DIContainerBuilder instance.
+   * @example
+   * ```typescript
+   * container.register(ApiServiceToken, HttpApiService)
+   * container.register(ApiServiceToken, MockApiService) // Replaces previous registration
+   * ```
+   */
+  register<T, Key extends string>(
     token: DIToken<T, Key>,
     value: T
   ): DIContainerBuilder;
 
-  overwriteFactory<
+  /**
+   * Registers a new factory with the specified token. Will replace any existing factory for the token.
+   *
+   * @param def - The factory definition to register.
+   * @returns The updated DIContainerBuilder instance.
+   * @example
+   * ```typescript
+   * container.registerFactory({
+   *   token: UseCaseToken,
+   *   dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
+   *   factory: UseCaseFactory
+   * })
+   * ```
+   */
+  registerFactory<
     Key extends string,
     const Deps extends DIFactoryDependencies,
     Return = unknown
@@ -144,7 +336,28 @@ export interface DIContainerBuilder {
     def: DIFactory<Key, Deps, Return>
   ): DIContainerBuilder;
 
-  overwriteFactoryArray<T extends readonly unknown[]>(values: {
+  /**
+   * Registers multiple factories with the specified tokens. Will replace any existing factories for the tokens.
+   *
+   * @param values - The factories to register.
+   * @returns The updated DIContainerBuilder instance.
+   * @example
+   * ```typescript
+   * container.registerFactoryArray([
+   *   {
+   *     token: UseCaseToken,
+   *     dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
+   *     factory: UseCaseFactory
+   *   },
+   *   {
+   *     token: OtherUseCaseToken,
+   *     dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
+   *     factory: OtherUseCaseFactory
+   *   }
+   * ])
+   * ```
+   **/
+  registerFactoryArray<T extends readonly unknown[]>(values: {
     [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
       ? T[K]
       : T[K] extends {
@@ -183,12 +396,12 @@ export function buildStrictDIContainer<State extends DIContainerState<T>, T>(
           `Token Symbol(${Symbol.keyFor(token as symbol)}) already registered`
         );
 
-      return diContainer.overwrite(
+      return diContainer.replace(
         token as unknown as DIToken<T, string>,
         value as unknown
       );
     },
-    overwrite(token, value) {
+    replace(token, value) {
       const newState = produce(containerState, (draft: any) => {
         draft[token as DIToken<typeof value, string>] = value;
         return draft;
@@ -220,9 +433,9 @@ export function buildStrictDIContainer<State extends DIContainerState<T>, T>(
         }
       }
 
-      return diContainer.overwriteFactory(value);
+      return diContainer.replaceFactory(value);
     },
-    overwriteFactory(value) {
+    replaceFactory(value) {
       if (typeof value !== "object") {
         throw new Error(`Factory must be an object. Got ${value} instead`);
       }
@@ -234,7 +447,7 @@ export function buildStrictDIContainer<State extends DIContainerState<T>, T>(
 
       return buildStrictDIContainer(newState) as unknown as any;
     },
-    overwriteFactoryArray(values) {
+    replaceFactoryArray(values) {
       const newState = produce(containerState, (draft: any) => {
         values.forEach((value) => {
           draft[value.token] = value;
@@ -295,17 +508,17 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         ...stateToMerge,
       }) as any;
     },
-    overwrite(token, value) {
+    register(token, value) {
       const newState = produce(containerState, (draft: any) => {
         draft[token as DIToken<typeof value, string>] = value;
         return draft;
       });
 
-      return buildStrictDIContainer(
+      return buildDIContainer(
         newState as State & { [K in typeof token]: typeof value }
-      ) as unknown as ReturnType<StrictDIContainerBuilder<State>["register"]>;
+      ) as unknown as ReturnType<DIContainerBuilder["register"]>;
     },
-    overwriteFactory(value) {
+    registerFactory(value) {
       if (typeof value !== "object") {
         throw new Error(`Factory must be an object. Got ${value} instead`);
       }
@@ -315,9 +528,9 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         return draft;
       });
 
-      return buildStrictDIContainer(newState) as unknown as any;
+      return buildDIContainer(newState) as unknown as any;
     },
-    overwriteFactoryArray(values) {
+    registerFactoryArray(values) {
       const newState = produce(containerState, (draft: any) => {
         values.forEach((value) => {
           draft[value.token] = value;
@@ -325,7 +538,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         return draft;
       });
 
-      return buildStrictDIContainer(newState) as unknown as any;
+      return buildDIContainer(newState) as unknown as any;
     },
     getResult(): DIContainer<State> {
       const diContainer: DIContainer<State> = {

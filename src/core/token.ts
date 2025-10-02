@@ -3,28 +3,55 @@
  */
 
 /**
- * Represents a Dependency Injection (DI) token.
- * Tokens are unique symbols used to identify dependencies in the DI container that carry a type for casting purposes.
+ * DIToken is a type-safe identifier for dependency injection.
+ * It uses symbols internally to ensure uniqueness and type safety.
  *
- * @typeParam T - The type of the dependency associated with the token.
- * @typeParam K - The key type for the token.
+ * @template T - The type of the dependency this token represents
+ * @template Key - A string literal type used for the symbol key
+ *
+ * @example
+ * ```typescript
+ * interface ApiService {
+ *   getData(): Promise<Data>;
+ * }
+ *
+ * // Create a token for the ApiService interface
+ * const ApiServiceToken = createDIToken<ApiService>().as("ApiService");
+ * ```
  */
-export type DIToken<T, K extends string> = symbol & {
-  __type: T;
-  __key: K;
+export type DIToken<T, Key extends string = string> = symbol & {
+  __TYPE__: T;
+  __KEY__: Key;
 };
 
 /**
- * Creates a Dependency Injection (DI) token.
- * Tokens are unique symbols used to identify dependencies in the DI container carrying a type for casting purposes.
+ * Creates a new DI token with type safety.
+ * The token acts as a unique key in the DI container while preserving type information.
  *
- * @param key - unique key for the token. Useful for debugging and serialization.
- * @returns A unique symbol representing the DI token carrying a type for casting purposes.
+ * @template T - The type that this token will represent
+ * @returns A token builder with the type information
+ *
+ * @example
+ * ```typescript
+ * // Basic token creation
+ * const token = createDIToken<string>().as("configToken");
+ *
+ * // Interface token creation
+ * interface UserService {
+ *   getCurrentUser(): User;
+ * }
+ * const userServiceToken = createDIToken<UserService>().as("UserService");
+ * ```
  */
-export function createDIToken<T>() {
-  return {
-    as: <K extends string>(key: K): DIToken<T, K> => {
-      return Symbol.for(key) as DIToken<T, K>;
-    },
-  };
-}
+export const createDIToken = <T>() => ({
+  /**
+   * Finalizes the token creation with a unique key.
+   * The key is used for type safety, debugging and serialization.
+   *
+   * @param key - A unique string identifier for this token
+   * @returns A type-safe DI token
+   * ```
+   */
+  as: <Key extends string>(key: Key): DIToken<T, Key> =>
+    Symbol.for(key) as DIToken<T, Key>,
+});
