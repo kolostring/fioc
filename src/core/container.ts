@@ -56,28 +56,32 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
 }
 
 /**
- * Represents a builder for creating a DI container.
- * A DI container builder allows registering dependencies and factories.
+ * Represents a builder for creating an strict DI container.
+ * A DI container builder allows registering dependencies and factories, and is strict in its type checking.
  */
-export interface DIContainerBuilder<
+export interface StrictDIContainerBuilder<
   DIState extends DIContainerState<D>,
   D = unknown
 > {
   merge<MD extends DIContainerState<any>>(
     containerState: MD
-  ): DIContainerBuilder<Merge<DIState & MD>>;
+  ): StrictDIContainerBuilder<Merge<DIState & MD>>;
 
   register<T, Key extends string>(
     token: DIToken<T, Key> extends keyof DIState
       ? "this token is already registered"
       : DIToken<T, Key>,
     value: T
-  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+  ): StrictDIContainerBuilder<
+    Merge<DIState & Registered<DIToken<T, Key>, T, Key>>
+  >;
 
   overwrite<T, Key extends string>(
     token: DIToken<T, Key>,
     value: T
-  ): DIContainerBuilder<Merge<DIState & Registered<DIToken<T, Key>, T, Key>>>;
+  ): StrictDIContainerBuilder<
+    Merge<DIState & Registered<DIToken<T, Key>, T, Key>>
+  >;
 
   registerFactory<
     Key extends string,
@@ -89,7 +93,7 @@ export interface DIContainerBuilder<
       : Extract<keyof DIState, DIToken<Deps[number], string>> extends never
       ? "One or more dependencies are not registered in the container"
       : DIFactory<Key, Deps, Return>
-  ): DIContainerBuilder<
+  ): StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;
 
@@ -99,7 +103,7 @@ export interface DIContainerBuilder<
     Return = unknown
   >(
     def: DIFactory<Key, Deps, Return>
-  ): DIContainerBuilder<
+  ): StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;
 
@@ -113,24 +117,65 @@ export interface DIContainerBuilder<
         }
       ? DIFactory<Key, Deps, Res>
       : DIFactory<string>;
-  }): DIContainerBuilder<DIState & StateFromFactories<T>>;
+  }): StrictDIContainerBuilder<DIState & StateFromFactories<T>>;
 
   getResult(): DIContainer<DIState>;
 }
 
 /**
- * Builder of a Dependency Injection (DI) container.
- * The container allows registering and resolving dependencies.
+ * Represents a builder for creating an DI container.
+ * A DI container builder allows registering dependencies and factories.
+ */
+export interface DIContainerBuilder {
+  merge<MD extends DIContainerState<any>>(
+    containerState: MD
+  ): DIContainerBuilder;
+
+  overwrite<T, Key extends string>(
+    token: DIToken<T, Key>,
+    value: T
+  ): DIContainerBuilder;
+
+  overwriteFactory<
+    Key extends string,
+    const Deps extends DIFactoryDependencies,
+    Return = unknown
+  >(
+    def: DIFactory<Key, Deps, Return>
+  ): DIContainerBuilder;
+
+  overwriteFactoryArray<T extends readonly unknown[]>(values: {
+    [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
+      ? T[K]
+      : T[K] extends {
+          token: DIToken<unknown, infer Key>;
+          dependencies: unknown[];
+          factory: (...args: infer Deps) => infer Res;
+        }
+      ? DIFactory<Key, Deps, Res>
+      : DIFactory<string>;
+  }): DIContainerBuilder;
+
+  getResult(): DIContainer<any>;
+}
+
+/**
+ * Builder of a Strict Dependency Injection (DI) container.
+ * The container allows registering and resolving dependencies
+ * with full and strict typesafe support.
  *
  * @param containerState - The initial state of the container (optional).
  * @returns A DI container builder for registering dependencies and creating a static container.
  */
-export function buildDIContainer<State extends DIContainerState<T>, T>(
+export function buildStrictDIContainer<State extends DIContainerState<T>, T>(
   containerState: State = {} as State
-): DIContainerBuilder<State> {
-  const diContainer: DIContainerBuilder<State> = {
+): StrictDIContainerBuilder<State> {
+  const diContainer: StrictDIContainerBuilder<State> = {
     merge(stateToMerge) {
-      return buildDIContainer({ ...containerState, ...stateToMerge }) as any;
+      return buildStrictDIContainer({
+        ...containerState,
+        ...stateToMerge,
+      }) as any;
     },
     register(token, value) {
       if (token in containerState)
@@ -149,9 +194,9 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         return draft;
       });
 
-      return buildDIContainer(
+      return buildStrictDIContainer(
         newState as State & { [K in typeof token]: typeof value }
-      ) as unknown as ReturnType<DIContainerBuilder<State>["register"]>;
+      ) as unknown as ReturnType<StrictDIContainerBuilder<State>["register"]>;
     },
     registerFactory(value) {
       if (typeof value !== "object" || !value) {
@@ -187,7 +232,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         return draft;
       });
 
-      return buildDIContainer(newState) as unknown as any;
+      return buildStrictDIContainer(newState) as unknown as any;
     },
     overwriteFactoryArray(values) {
       const newState = produce(containerState, (draft: any) => {
@@ -197,7 +242,90 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         return draft;
       });
 
-      return buildDIContainer(newState) as unknown as any;
+      return buildStrictDIContainer(newState) as unknown as any;
+    },
+    getResult(): DIContainer<State> {
+      const diContainer: DIContainer<State> = {
+        getState: () => containerState,
+        resolve: <T, Key extends string>(toResolve: DIToken<unknown, Key>) => {
+          const token = toResolve;
+
+          if (!(token in containerState))
+            throw new Error(
+              `Could not Resolve: Token Symbol(${Symbol.keyFor(
+                token
+              )}) not found`
+            );
+          const state = (containerState as any)[token];
+
+          if (!(state as DIFactory<Key>).dependencies) {
+            return state as T;
+          }
+
+          return (state as DIFactory<Key>).factory(
+            ...(state as DIFactory<Key>).dependencies.map(
+              (dep: DIToken<unknown, string>) => diContainer.resolve(dep)
+            )
+          ) as T;
+        },
+      };
+
+      return diContainer;
+    },
+  };
+
+  return diContainer;
+}
+
+/**
+ * Builder of a Strict Dependency Injection (DI) container.
+ * The container allows registering and resolving dependencies
+ * with full and strict typesafe support.
+ *
+ * @param containerState - The initial state of the container (optional).
+ * @returns A DI container builder for registering dependencies and creating a static container.
+ */
+export function buildDIContainer<State extends DIContainerState<T>, T>(
+  containerState: State = {} as State
+): DIContainerBuilder {
+  const diContainer: DIContainerBuilder = {
+    merge(stateToMerge) {
+      return buildDIContainer({
+        ...containerState,
+        ...stateToMerge,
+      }) as any;
+    },
+    overwrite(token, value) {
+      const newState = produce(containerState, (draft: any) => {
+        draft[token as DIToken<typeof value, string>] = value;
+        return draft;
+      });
+
+      return buildStrictDIContainer(
+        newState as State & { [K in typeof token]: typeof value }
+      ) as unknown as ReturnType<StrictDIContainerBuilder<State>["register"]>;
+    },
+    overwriteFactory(value) {
+      if (typeof value !== "object") {
+        throw new Error(`Factory must be an object. Got ${value} instead`);
+      }
+
+      const newState = produce(containerState, (draft: any) => {
+        draft[value.token] = value;
+        return draft;
+      });
+
+      return buildStrictDIContainer(newState) as unknown as any;
+    },
+    overwriteFactoryArray(values) {
+      const newState = produce(containerState, (draft: any) => {
+        values.forEach((value) => {
+          draft[value.token] = value;
+        });
+        return draft;
+      });
+
+      return buildStrictDIContainer(newState) as unknown as any;
     },
     getResult(): DIContainer<State> {
       const diContainer: DIContainer<State> = {

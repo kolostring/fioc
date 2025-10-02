@@ -1,5 +1,9 @@
 import { produce } from "immer";
-import { DIContainer, DIContainerState, buildDIContainer } from "./container";
+import {
+  DIContainer,
+  DIContainerState,
+  buildStrictDIContainer,
+} from "./container";
 
 /**
  * Represents the state of a DI manager.
@@ -95,7 +99,7 @@ export function buildDIContainerManager(
         getContainer(key: string | undefined) {
           if (!containers[key ?? currentContainer])
             throw new Error("Container not found");
-          return buildDIContainer(
+          return buildStrictDIContainer(
             containers[key ?? currentContainer]
           ).getResult();
         },
