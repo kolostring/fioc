@@ -1,18 +1,17 @@
 # FIOC
 
-FIOC (Functional Inversion Of Control) is a lightweight dependency injection library for JS/TS applications. It simplifies the management of dependencies by providing a flexible and **type-safe** way to define, register, and resolve dependencies, without the need of reflection or decorators.
+FIOC (Functional Inversion Of Control) is a lightweight dependency injection library for JS/TS applications. It simplifies dependency management with a flexible, type-safe approach, without requiring reflection or decorators. For stricter type safety, see [@fioc/strict](#fiocstrict).
 
 ## Features
 
-- 🪶 **Lightweight**: Zero dependencies except for Immer, designed to integrate seamlessly into your existing projects
-- 🔒 **Type-safe by design**: Get compile-time validation of your dependency tree
-- 🎯 **No Type Casting**: Dependencies are automatically resolved to their correct types
-- 🛡️ **Compile-time Validation**: Catch dependency registration errors before running your app
-- 🏗️ **Builder Pattern**: Fluent API for registering and managing dependencies
-- 🔄 **Immutable**: Container state is immutable for safe concurrent usage
-- 🔌 **Universal**: Works in both front-end and back-end environments
-- 🎮 **Flexible Factory System**: Support for value registration, factory functions, and class constructors
-- 🧩 **Modular Design**: Merge containers and switch between different configurations easily
+- 🪶 **Lightweight**: Zero dependencies except for Immer, integrates seamlessly
+- 🎯 **No Type Casting**: Dependencies resolve to correct types automatically, without the need of casting
+- 🏗️ **Builder Pattern**: Fluent API for dependency registration
+- 🔄 **Immutable**: Immutable container state for safe concurrency
+- 🔌 **Universal**: Works in front-end and back-end environments
+- 🎮 **Flexible Factory System**: Supports value registration, factory functions, and class constructors
+- 🧩 **Modular Design**: Merge containers and switch configurations easily
+- 🔗 **Enhanced Type Safety**: See [@fioc/strict](#fiocstrict) for strict compile-time validation
 
 [Jump to Basic Usage →](#basic-usage)
 
@@ -25,33 +24,33 @@ FIOC (Functional Inversion Of Control) is a lightweight dependency injection lib
 - [Advanced Usage](#advanced-usage)
   - [Factories](#factories)
   - [Class Factories](#class-factories)
-  - [Type-Safe Container Features](#type-safe-container-features)
   - [Container Manager](#container-manager)
+- [@fioc/strict](#fiocstrict)
 
 ## Installation
 
-Install the library using npm, pnpm or yarn:
+Install using npm, pnpm, or yarn:
 
 ```bash
-npm install fioc
+npm install @fioc/core
 ```
 
 ```bash
-pnpm install fioc
+pnpm install @fioc/core
 ```
 
 ```bash
-yarn add fioc
+yarn add @fioc/core
 ```
 
 ## Basic Usage
 
 ### Creating Tokens
 
-First, create tokens for your dependencies using the `createDIToken` function. The token is a type-safe identifier for your dependency:
+Create tokens for dependencies using `createDIToken`:
 
 ```ts
-import { createDIToken } from "fioc";
+import { createDIToken } from "@fioc/core";
 
 interface ApiService {
   getData: () => string;
@@ -62,10 +61,10 @@ const ApiServiceToken = createDIToken<ApiService>().as("ApiService");
 
 ### Registering & Resolving
 
-Register your implementations using the container builder and resolve them when needed:
+Register and resolve dependencies using the container builder:
 
 ```ts
-import { buildDIContainer } from "fioc";
+import { buildDIContainer } from "@fioc/core";
 import { ApiService, ApiServiceToken } from "./interfaces/ApiService";
 
 const HttpApiService: ApiService = {
@@ -86,7 +85,7 @@ apiService.getData(); // "Hello, World!"
 
 ### Factories
 
-Factories are functions that construct values based on other dependencies. Common use cases include creating use cases that depend on services or repositories:
+Factories create values based on dependencies, with type-safe dependency arrays:
 
 ```ts
 import { ApiServiceToken } from "./interfaces/ApiService";
@@ -101,24 +100,24 @@ export const getDataUseCaseToken =
     "getDataUseCase"
   );
 
-// Register the factory with its dependencies
+// Register factory with type-safe dependencies
 container.registerFactory({
-  dependencies: [ApiServiceToken],
+  dependencies: [ApiServiceToken], // Get type error if dependencies don't match factory params
   token: getDataUseCaseToken,
   factory: getDataUseCaseFactory,
 });
 
-// Resolve and use the factory
-const getDataUseCase = container.resolve(getDataUseCaseToken); // Type infers as (ids: string[]) => Promise<string>
-getDataUseCase(); // Calls apiService.getData()
+// Resolve and use
+const getDataUseCase = container.resolve(getDataUseCaseToken);
+getDataUseCase(["id1", "id2"]);
 ```
 
 ### Class Factories
 
-You can also use classes with FIOC. The `constructorToFactory` helper converts class constructors to factory functions:
+Use classes with `constructorToFactory`:
 
 ```ts
-import { constructorToFactory } from "fioc";
+import { constructorToFactory } from "@fioc/core";
 
 export class GetDataUseCase {
   constructor(private apiService: ApiService) {}
@@ -135,40 +134,12 @@ container.registerFactory({
 });
 ```
 
-### Type-Safe Container Features
-
-For enhanced type safety, use `buildStrictDIContainer`. It provides compile-time validation of your dependency tree:
-
-```ts
-import { buildStrictDIContainer } from "fioc";
-
-const container = buildStrictDIContainer()
-  // Error if token already registered
-  .register(ApiServiceToken, HttpApiService)
-
-  // Error if dependencies not registered
-  .registerFactory({
-    dependencies: [ApiServiceToken],
-    token: useCaseToken,
-    factory: myFactory,
-  })
-
-  // Safe replacement of existing registrations
-  .replace(ApiServiceToken, newImplementation)
-  .replaceFactory({
-    dependencies: [NewApiServiceToken],
-    token: useCaseToken,
-    factory: newFactory,
-  })
-  .getResult();
-```
-
 ### Container Manager
 
-The Container Manager allows you to manage multiple containers - useful for different environments or testing:
+Manage multiple containers for different environments or testing:
 
 ```ts
-import { buildDIManager } from "fioc";
+import { buildDIManager } from "@fioc/core";
 
 const manager = buildDIManager()
   .registerContainer(productionContainer, "prod")
@@ -176,7 +147,7 @@ const manager = buildDIManager()
   .getResult()
   .setDefaultContainer("prod");
 
-// Get the active container
+// Get active container
 const container = manager.getContainer();
 
 // Switch containers
@@ -185,9 +156,18 @@ manager.setActiveContainer("test");
 
 Use cases for Container Manager:
 
-- Managing different environments (production vs development)
+- Managing production vs. development environments
 - Switching between online/offline implementations
 - Testing with mock implementations
+
+## @fioc/strict
+
+For enhanced type safety with compile-time validation, use [@fioc/strict](https://www.npmjs.com/package/@fioc/strict). It provides:
+
+- Type errors for unregistered or duplicate dependencies
+- Type `never` for resolving unregistered dependencies
+- Safe replacement of registrations
+- Type-safe container merging
 
 [Back to Top ↑](#fioc)
 
