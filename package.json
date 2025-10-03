@@ -1,6 +1,6 @@
 {
   "name": "fioc",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "license": "MIT",
   "main": "./dist/cjs/index.cjs",
@@ -37,7 +37,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "release": "tsup && npm publish --access public"
   },
   "dependencies": {
     "immer": "^10.1.1"

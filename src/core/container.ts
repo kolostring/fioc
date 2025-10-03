@@ -194,9 +194,15 @@ export interface StrictDIContainerBuilder<
   >(
     def: DIToken<Return, Key> extends keyof DIState
       ? "This token is already registered"
-      : Extract<keyof DIState, DIToken<Deps[number], string>> extends never
-      ? "One or more dependencies are not registered in the container"
-      : DIFactory<Key, Deps, Return>
+      : Exclude<
+          DIToken<Deps[number], string>,
+          DIToken<
+            keyof DIState extends DIToken<infer T, string> ? T : never,
+            string
+          >
+        > extends never
+      ? DIFactory<Key, Deps, Return>
+      : "One or more dependencies are not registered in the container"
   ): StrictDIContainerBuilder<
     Merge<DIState & Registered<DIToken<Return, Key>, Return, Key>>
   >;

@@ -409,20 +409,19 @@ describe("Container Type Differences", () => {
     const FactoryD =
       createDIToken<ReturnType<typeof factoryD>>().as("FactoryD");
 
-    // DIContainer allows registration in any order
-    const container1 = buildDIContainer()
-      .registerFactory({
-        token: FactoryD,
-        factory: factoryD,
-        dependencies: [FactoryC],
-      })
+    const container1 = buildStrictDIContainer()
+      .register(ServiceA, serviceAImpl)
+      .register(ServiceB, serviceBImpl)
       .registerFactory({
         token: FactoryC,
         factory: factoryC,
         dependencies: [ServiceA, ServiceB],
       })
-      .register(ServiceA, serviceAImpl)
-      .register(ServiceB, serviceBImpl)
+      .registerFactory({
+        token: FactoryD,
+        factory: factoryD,
+        dependencies: [FactoryC],
+      })
       .getResult();
 
     // StrictDIContainer requires dependencies to be registered before use
