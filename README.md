@@ -1,17 +1,17 @@
-# FIOC
+# @fioc/core
 
-FIOC (Functional Inversion Of Control) is a lightweight dependency injection library for JS/TS applications. It simplifies dependency management with a flexible, type-safe approach, without requiring reflection or decorators. For stricter type safety, see [@fioc/strict](#fiocstrict).
+@fioc/core is a lightweight dependency injection library for JavaScript and TypeScript applications. It simplifies dependency management with a flexible, type-safe approach, without requiring reflection or decorators. It serves as the foundation for the FIOC ecosystem, including integrations for React and Next.js. For stricter type safety, see [@fioc/strict](#fiocstrict).
 
 ## Features
 
-- 🪶 **Lightweight**: Zero dependencies except for Immer, integrates seamlessly
-- 🎯 **No Type Casting**: Dependencies resolve to correct types automatically, without the need of casting
+- 🪶 **Lightweight**: Only depends on Immer, integrates seamlessly
+- 🎯 **No Type Casting**: Dependencies resolve to correct types automatically
 - 🏗️ **Builder Pattern**: Fluent API for dependency registration
 - 🔄 **Immutable**: Immutable container state for safe concurrency
 - 🔌 **Universal**: Works in front-end and back-end environments
 - 🎮 **Flexible Factory System**: Supports value registration, factory functions, and class constructors
 - 🧩 **Modular Design**: Merge containers and switch configurations easily
-- 🔗 **Enhanced Type Safety**: See [@fioc/strict](#fiocstrict) for strict compile-time validation
+- 🔗 **Ecosystem Foundation**: Powers [@fioc/react](https://www.npmjs.com/package/@fioc/react), [@fioc/next](https://www.npmjs.com/package/@fioc/next), and [@fioc/strict](https://www.npmjs.com/package/@fioc/strict)
 
 [Jump to Basic Usage →](#basic-usage)
 
@@ -25,7 +25,7 @@ FIOC (Functional Inversion Of Control) is a lightweight dependency injection lib
   - [Factories](#factories)
   - [Class Factories](#class-factories)
   - [Container Manager](#container-manager)
-- [@fioc/strict](#fiocstrict)
+- [FIOC Ecosystem](#fioc-ecosystem)
 
 ## Installation
 
@@ -102,7 +102,7 @@ export const getDataUseCaseToken =
 
 // Register factory with type-safe dependencies
 container.registerFactory({
-  dependencies: [ApiServiceToken], // Get type error if dependencies don't match factory params
+  dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
   token: getDataUseCaseToken,
   factory: getDataUseCaseFactory,
 });
@@ -160,16 +160,15 @@ Use cases for Container Manager:
 - Switching between online/offline implementations
 - Testing with mock implementations
 
-## @fioc/strict
+## FIOC Ecosystem
 
-For enhanced type safety with compile-time validation, use [@fioc/strict](https://www.npmjs.com/package/@fioc/strict). It provides:
+The FIOC ecosystem provides specialized libraries for various use cases:
 
-- Type errors for unregistered or duplicate dependencies
-- Type `never` for resolving unregistered dependencies
-- Safe replacement of registrations
-- Type-safe container merging
+- [@fioc/strict](https://www.npmjs.com/package/@fioc/strict): Enhanced type safety with compile-time validation, including type errors for unregistered or duplicate dependencies and type `never` when resolving unregistered dependencies.
+- [@fioc/react](https://www.npmjs.com/package/@fioc/react): Dependency injection for React applications, with hooks and context providers for seamless integration.
+- [@fioc/next](https://www.npmjs.com/package/@fioc/next): Optimized for Next.js, enabling type-safe integration with React Server Components and Server Actions.
 
-[Back to Top ↑](#fioc)
+[Back to Top ↑](#fioccore)
 
 ## Contributing
 
