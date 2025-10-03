@@ -1,6 +1,6 @@
 {
-  "name": "fioc",
-  "version": "1.4.1",
+  "name": "@fioc/core",
+  "version": "1.4.2",
   "type": "module",
   "license": "MIT",
   "main": "./dist/cjs/index.cjs",
