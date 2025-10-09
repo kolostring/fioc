@@ -58,6 +58,19 @@ export const createDIToken = <T>() => ({
     Symbol.for(key) as DIToken<T, Key>,
 });
 
+/**
+ * Creates a new DI token with type safety for a factory.
+ * The token acts as a unique key in the DI container while preserving type information.
+ *
+ * @template T - The factory type that this token will represent
+ * @returns A token builder with the type information
+ *
+ * @example
+ * ```typescript
+ * // Basic token creation
+ * const token = createDIToken<DIFactory<string>>().as("configToken");
+ * ```
+ */
 export const createFactoryDIToken = <T>() => ({
   /**
    * Finalizes the token creation with a unique key.

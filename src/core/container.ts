@@ -54,6 +54,12 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
    */
   getState(): State;
 
+  /**
+   * Creates a new scope for the container. All "scoped" dependencies resolved within the scope will be cached.
+   * This is useful for creating isolated units of work that can be used across multiple parts of your application.
+   *
+   * @param callback Scoped code to execute
+   */
   createScope(callback: (resolve: <T>(token: DIToken<T>) => T) => void): void;
 }
 

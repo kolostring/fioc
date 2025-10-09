@@ -43,11 +43,10 @@ export type DIFactory<
   factory: (...args: Deps) => Return;
 };
 
+/**
+ * Returns the return type of a DIFactory
+ */
 export type FactoryReturnType<F> = F extends DIFactory<any, infer R>
-  ? R
-  : never;
-
-export type ReturnTypeOfFactory<F> = F extends DIFactory<any, infer R>
   ? R
   : never;
 
