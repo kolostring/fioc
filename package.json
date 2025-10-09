@@ -1,6 +1,6 @@
 {
   "name": "@fioc/core",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "type": "module",
   "license": "MIT",
   "main": "./dist/cjs/index.cjs",
@@ -21,7 +21,8 @@
     "functional dependency injection",
     "di container",
     "typescript",
-    "ioc"
+    "ioc",
+    "fluid inversion of control"
   ],
   "description": "A lightweight and type-safe dependency injection library for JS/TS, designed to simplify dependency management",
   "author": "kolostring <yoerodriguezjunior@gmail.com>",
