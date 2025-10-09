@@ -53,6 +53,8 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
    * ```
    */
   getState(): State;
+
+  createScope(callback: (resolve: <T>(token: DIToken<T>) => T) => void): void;
 }
 
 /**
@@ -113,7 +115,8 @@ export interface DIContainerBuilder {
     Return = unknown
   >(
     token: DIToken<Return, Key>,
-    factoryWithDeps: DIFactory<Deps, Return>
+    factoryWithDeps: DIFactory<Deps, Return>,
+    scope?: "transient" | "singleton" | "scoped"
   ): DIContainerBuilder;
 
   /**
@@ -154,6 +157,18 @@ export interface DIContainerBuilder {
   getResult(): DIContainer<any>;
 }
 
+function defineSingleton<
+  T extends (...args: Params) => any,
+  Params extends any[]
+>(fn: T) {
+  let instance: ReturnType<T> | undefined;
+
+  return (...args: Params) => {
+    instance ??= fn(...args);
+    return instance as ReturnType<T>;
+  };
+}
+
 /**
  * Builder of a Strict Dependency Injection (DI) container.
  * The container allows registering and resolving dependencies
@@ -182,13 +197,21 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         newState as State & { [K in typeof token]: typeof value }
       ) as unknown as ReturnType<DIContainerBuilder["register"]>;
     },
-    registerFactory(token, factory) {
-      if (typeof factory !== "object") {
-        throw new Error(`Factory must be an object. Got ${factory} instead`);
+    registerFactory(token, value, scope) {
+      if (typeof value !== "object") {
+        throw new Error(`Factory must be an object. Got ${value} instead`);
       }
 
       const newState = produce(containerState, (draft: any) => {
-        draft[token] = factory;
+        const val =
+          scope === "singleton"
+            ? { ...value, factory: defineSingleton(value.factory) }
+            : value;
+
+        draft[token] = {
+          ...val,
+          scope,
+        };
         return draft;
       });
 
@@ -227,6 +250,21 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
               (dep: DIToken<unknown, string>) => diContainer.resolve(dep)
             )
           ) as T;
+        },
+        createScope(callback) {
+          const instances: { [key: DIToken<any>]: any } = {};
+          const scopedResolve: (typeof diContainer)["resolve"] = (
+            token: DIToken<any>
+          ) => {
+            if (token in instances) return instances[token];
+            const resolved = diContainer.resolve(token);
+            if ((diContainer.getState() as any)[token]?.["scope"] === "scoped")
+              instances[token] = resolved;
+
+            return resolved;
+          };
+
+          callback(scopedResolve);
         },
       };
 

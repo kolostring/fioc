@@ -53,7 +53,79 @@ describe("Dependency Injection Container", () => {
     expect(resolvedA).toBe("Factory C depends on A");
   });
 
-  it("should register factory classes", () => {
+  it("should resolve singleton factories correctly", () => {
+    const factoryCFactory = withDependencies(RepoA).defineFactory((repoA) => {
+      return () => `Factory C depends on ${repoA.getFooA()}`;
+    });
+
+    const factoryC =
+      createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
+
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(factoryC, factoryCFactory, "singleton")
+      .getResult();
+
+    const resolvedA = container.resolve(factoryC);
+    const resolvedB = container.resolve(factoryC);
+    expect(resolvedA === resolvedB).toBeTruthy();
+  });
+
+  it("should resolve transient factories correctly", () => {
+    const factoryCFactory = withDependencies(RepoA).defineFactory((repoA) => {
+      return () => `Factory C depends on ${repoA.getFooA()}`;
+    });
+
+    const factoryC =
+      createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
+
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(factoryC, factoryCFactory)
+      .getResult();
+
+    const resolvedA = container.resolve(factoryC);
+    const resolvedB = container.resolve(factoryC);
+    expect(resolvedA !== resolvedB).toBeTruthy();
+  });
+
+  it("should resolve scoped factories correctly", () => {
+    const factoryCFactory = withDependencies(RepoA).defineFactory((repoA) => {
+      return () => `Factory C depends on ${repoA.getFooA()}`;
+    });
+
+    const factoryC =
+      createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
+
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(factoryC, factoryCFactory, "scoped")
+      .getResult();
+
+    let resolvedA;
+    let resolvedB;
+
+    container.createScope((resolve) => {
+      resolvedA = resolve(factoryC);
+      resolvedB = resolve(factoryC);
+    });
+
+    let resolvedC;
+    container.createScope((resolve) => {
+      resolvedC = resolve(factoryC);
+    });
+
+    expect(resolvedA === resolvedB).toBeTruthy();
+    expect(resolvedC !== resolvedA).toBeTruthy();
+  });
+
+  it("should resolve transient factory classes", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     class FactoryClass {
@@ -78,6 +150,77 @@ describe("Dependency Injection Container", () => {
 
     const resolvedA = container.resolve(factoryClassToken).fooA();
     expect(resolvedA).toBe("From Factory Class A");
+  });
+
+  it("should resolve singleton factory classes", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    class FactoryClass {
+      constructor(private readonly repoA: RepoA) {}
+
+      fooA() {
+        return `From Factory Class ${this.repoA.getFooA()}`;
+      }
+    }
+
+    const factoryClassToken = createDIToken<FactoryClass>().as("factoryClass");
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(
+        factoryClassToken,
+        withDependencies(RepoA).defineFactory(
+          constructorToFactory(FactoryClass)
+        ),
+        "singleton"
+      )
+      .getResult();
+
+    const resolvedA = container.resolve(factoryClassToken);
+    const resolvedB = container.resolve(factoryClassToken);
+    expect(resolvedA === resolvedB).toBeTruthy();
+    expect(resolvedA.fooA()).toBe("From Factory Class A");
+  });
+
+  it("should resolve singleton factory classes", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    class FactoryClass {
+      constructor(private readonly repoA: RepoA) {}
+
+      fooA() {
+        return `From Factory Class ${this.repoA.getFooA()}`;
+      }
+    }
+
+    const factoryClassToken = createDIToken<FactoryClass>().as("factoryClass");
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(
+        factoryClassToken,
+        withDependencies(RepoA).defineFactory(
+          constructorToFactory(FactoryClass)
+        ),
+        "scoped"
+      )
+      .getResult();
+
+    let resolvedA;
+    let resolvedB;
+
+    container.createScope((resolve) => {
+      resolvedA = resolve(factoryClassToken);
+      resolvedB = resolve(factoryClassToken);
+    });
+
+    let resolvedC;
+    container.createScope((resolve) => {
+      resolvedC = resolve(factoryClassToken);
+    });
+
+    expect(resolvedA === resolvedB).toBeTruthy();
+    expect(resolvedC !== resolvedA).toBeTruthy();
   });
 
   it("should register factory arrays", () => {
