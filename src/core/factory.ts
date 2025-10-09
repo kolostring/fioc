@@ -1,12 +1,6 @@
 import { DIToken } from "./token";
 
 /**
- * Type alias for an array of DI tokens representing factory dependencies.
- * Used to ensure type safety when defining factory dependencies.
- */
-export type DIFactoryDependencies = readonly DIToken<any, string>[];
-
-/**
  * Represents a factory definition in the DI container.
  * Factories are used to create instances that depend on other registered services.
  *
@@ -33,15 +27,9 @@ export type DIFactoryDependencies = readonly DIToken<any, string>[];
  * ```
  */
 export type DIFactory<
-  Key extends string,
   Deps extends readonly unknown[] = unknown[],
   Return = unknown
 > = {
-  /**
-   * The token that identifies this factory's output in the container
-   */
-  token: DIToken<Return, Key>;
-
   /**
    * Array of tokens representing the dependencies required by this factory
    * The order must match the parameters of the factory function
@@ -54,6 +42,14 @@ export type DIFactory<
    */
   factory: (...args: Deps) => Return;
 };
+
+export type FactoryReturnType<F> = F extends DIFactory<any, infer R>
+  ? R
+  : never;
+
+export type ReturnTypeOfFactory<F> = F extends DIFactory<any, infer R>
+  ? R
+  : never;
 
 /**
  * Converts a class constructor into a factory function for use with FIOC.
@@ -85,3 +81,28 @@ export const constructorToFactory =
   <T extends new (...args: any[]) => any>(constructor: T) =>
   (...args: ConstructorParameters<T>): InstanceType<T> =>
     new constructor(...args);
+
+/**
+ * Utility function for creating a DIFactory
+ *
+ * @param dependencies - Factory's dependencies as tokens
+ * @returns A factory builder
+ */
+export function withDependencies<Deps extends readonly unknown[]>(
+  ...dependencies: { [P in keyof Deps]: DIToken<Deps[P], string> }
+) {
+  return {
+    /**
+     * Creates a DIFactory with the specified dependencies and factory function.
+     *
+     * @param factory - The factory function to use
+     * @returns A DIFactory with the specified dependencies and factory function
+     */
+    defineFactory: <Return>(
+      factory: (...deps: Deps) => Return
+    ): DIFactory<Deps, Return> => ({
+      dependencies,
+      factory,
+    }),
+  };
+}

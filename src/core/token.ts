@@ -2,6 +2,8 @@
  * This module contains token-related type definitions and functions.
  */
 
+import { DIFactory } from "./factory";
+
 /**
  * DIToken is a type-safe identifier for dependency injection.
  * It uses symbols internally to ensure uniqueness and type safety.
@@ -54,4 +56,20 @@ export const createDIToken = <T>() => ({
    */
   as: <Key extends string>(key: Key): DIToken<T, Key> =>
     Symbol.for(key) as DIToken<T, Key>,
+});
+
+export const createFactoryDIToken = <T>() => ({
+  /**
+   * Finalizes the token creation with a unique key.
+   * The key is used for type safety, debugging and serialization.
+   *
+   * @param key - A unique string identifier for this token
+   * @returns A type-safe DI token
+   * ```
+   */
+  as: <Key extends string>(key: Key) =>
+    Symbol.for(key) as DIToken<
+      T extends DIFactory<any, infer R> ? R : never,
+      Key
+    >,
 });

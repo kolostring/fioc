@@ -3,7 +3,8 @@ import {
   buildDIContainer,
   createDIToken,
   constructorToFactory,
-  buildStrictDIContainer,
+  withDependencies,
+  createFactoryDIToken,
 } from "../..";
 
 interface RepoA {
@@ -34,21 +35,18 @@ describe("Dependency Injection Container", () => {
   });
 
   it("should resolve factories", () => {
-    const factoryCFactory = (repoA: RepoA) => () =>
-      `Factory C depends on ${repoA.getFooA()}`;
+    const factoryCFactory = withDependencies(RepoA).defineFactory((repoA) => {
+      return () => `Factory C depends on ${repoA.getFooA()}`;
+    });
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
+      createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
 
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactory({
-        token: factoryC,
-        factory: factoryCFactory,
-        dependencies: [RepoA],
-      })
+      .registerFactory(factoryC, factoryCFactory)
       .getResult();
 
     const resolvedA = container.resolve(factoryC)();
@@ -70,11 +68,12 @@ describe("Dependency Injection Container", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactory({
-        token: factoryClassToken,
-        factory: constructorToFactory(FactoryClass),
-        dependencies: [RepoA],
-      })
+      .registerFactory(
+        factoryClassToken,
+        withDependencies(RepoA).defineFactory(
+          constructorToFactory(FactoryClass)
+        )
+      )
       .getResult();
 
     const resolvedA = container.resolve(factoryClassToken).fooA();
@@ -160,23 +159,18 @@ describe("Dependency Injection Container", () => {
     const repoAImpl: RepoA = { getFooA: () => "A" };
     const repoBImpl: RepoB = { getFooB: () => "B" };
 
-    const factoryCFactory =
-      (repoA: RepoA, repoB: RepoB) => (arg1: string, arg2: number) =>
-        `Factory C (${arg1}, ${arg2}) depends on ${repoA.getFooA()} and ${repoB.getFooB()}`;
+    const factoryCFactory = withDependencies(RepoA, RepoB).defineFactory(
+      (repoA, repoB) => (arg1: string, arg2: number) =>
+        `Factory C (${arg1}, ${arg2}) depends on ${repoA.getFooA()} and ${repoB.getFooB()}`
+    );
 
     const factoryC =
-      createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
+      createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .register(RepoB, repoBImpl)
-      .registerFactoryArray([
-        {
-          token: factoryC,
-          factory: factoryCFactory,
-          dependencies: [RepoA, RepoB],
-        },
-      ])
+      .registerFactory(factoryC, factoryCFactory)
       .getResult();
 
     const resolvedAC = container.resolve(factoryC)("arg1", 1);
@@ -238,13 +232,11 @@ describe("Dependency Injection Container", () => {
       .getResult();
     const containerC = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactory({
-        token: factoryC,
+      .registerFactory(factoryC, {
         factory: factoryCFactory,
         dependencies: [RepoA],
       })
-      .registerFactory({
-        token: factoryD,
+      .registerFactory(factoryD, {
         factory: factoryDFactory,
         dependencies: [factoryC],
       })
@@ -266,8 +258,7 @@ describe("Dependency Injection Container", () => {
       createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
 
     const container = buildDIContainer()
-      .registerFactory({
-        token: factory,
+      .registerFactory(factory, {
         factory: factoryCFactory,
         dependencies: [RepoA],
       })
@@ -301,13 +292,11 @@ describe("Dependency Injection Container", () => {
       createDIToken<ReturnType<typeof factoryCFactory>>().as("factoryCToken");
 
     const container = buildDIContainer()
-      .registerFactory({
-        token: factoryC,
+      .registerFactory(factoryC, {
         factory: factoryCFactory,
         dependencies: [factoryD],
       })
-      .registerFactory({
-        token: factoryD,
+      .registerFactory(factoryD, {
         factory: factoryDFactory,
         dependencies: [factoryC],
       })
@@ -337,8 +326,7 @@ describe("Container Type Differences", () => {
 
     // DIContainer allows registration of factories with missing dependencies
     const container = buildDIContainer()
-      .registerFactory({
-        token: FactoryToken,
+      .registerFactory(FactoryToken, {
         factory: serviceFactory,
         dependencies: [ServiceA],
       })
@@ -371,29 +359,15 @@ describe("Container Type Differences", () => {
     const serviceAImpl: ServiceA = { getA: () => "A" };
 
     // StrictDIContainer requires all dependencies to be registered first
-    const container = buildStrictDIContainer()
+    const container = buildDIContainer()
       .register(ServiceA, serviceAImpl)
-      .registerFactory({
-        token: FactoryToken,
+      .registerFactory(FactoryToken, {
         factory: serviceFactory,
         dependencies: [ServiceA],
       })
       .getResult();
 
     expect(container.resolve(FactoryToken)()).toBe("A");
-  });
-
-  it("should prevent duplicate registration with StrictDIContainer", () => {
-    const serviceAImpl: ServiceA = { getA: () => "A1" };
-    const serviceAImpl2: ServiceA = { getA: () => "A2" };
-
-    // StrictDIContainer prevents re-registration of the same token
-    expect(() => {
-      buildStrictDIContainer()
-        .register(ServiceA, serviceAImpl)
-        //@ts-expect-error - Testing duplicate registration
-        .register(ServiceA, serviceAImpl2); // This should throw
-    }).toThrowError("Token Symbol(ServiceA) already registered");
   });
 
   it("should handle complex dependency chains differently", () => {
@@ -409,32 +383,28 @@ describe("Container Type Differences", () => {
     const FactoryD =
       createDIToken<ReturnType<typeof factoryD>>().as("FactoryD");
 
-    const container1 = buildStrictDIContainer()
+    const container1 = buildDIContainer()
       .register(ServiceA, serviceAImpl)
       .register(ServiceB, serviceBImpl)
-      .registerFactory({
-        token: FactoryC,
+      .registerFactory(FactoryC, {
         factory: factoryC,
         dependencies: [ServiceA, ServiceB],
       })
-      .registerFactory({
-        token: FactoryD,
+      .registerFactory(FactoryD, {
         factory: factoryD,
         dependencies: [FactoryC],
       })
       .getResult();
 
     // StrictDIContainer requires dependencies to be registered before use
-    const container2 = buildStrictDIContainer()
+    const container2 = buildDIContainer()
       .register(ServiceA, serviceAImpl)
       .register(ServiceB, serviceBImpl)
-      .registerFactory({
-        token: FactoryC,
+      .registerFactory(FactoryC, {
         factory: factoryC,
         dependencies: [ServiceA, ServiceB],
       })
-      .registerFactory({
-        token: FactoryD,
+      .registerFactory(FactoryD, {
         factory: factoryD,
         dependencies: [FactoryC],
       })

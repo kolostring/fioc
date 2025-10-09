@@ -112,7 +112,8 @@ export interface DIContainerBuilder {
     Deps extends readonly any[],
     Return = unknown
   >(
-    def: DIFactory<Key, Deps, Return>
+    token: DIToken<Return, Key>,
+    factoryWithDeps: DIFactory<Deps, Return>
   ): DIContainerBuilder;
 
   /**
@@ -137,15 +138,17 @@ export interface DIContainerBuilder {
    * ```
    **/
   registerFactoryArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIFactory<infer Key, infer D, infer R>
+    [K in keyof T]: T[K] extends DIFactory<infer D, infer R> & {
+      token: DIToken<unknown, infer Key>;
+    }
       ? T[K]
       : T[K] extends {
           token: DIToken<unknown, infer Key>;
           dependencies: unknown[];
           factory: (...args: infer Deps) => infer Res;
         }
-      ? DIFactory<Key, Deps, Res>
-      : DIFactory<string>;
+      ? { token: DIToken<unknown, Key> } & DIFactory<Deps, Res>
+      : { token: DIToken<unknown, string> } & DIFactory;
   }): DIContainerBuilder;
 
   getResult(): DIContainer<any>;
@@ -179,13 +182,13 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         newState as State & { [K in typeof token]: typeof value }
       ) as unknown as ReturnType<DIContainerBuilder["register"]>;
     },
-    registerFactory(value) {
-      if (typeof value !== "object") {
-        throw new Error(`Factory must be an object. Got ${value} instead`);
+    registerFactory(token, factory) {
+      if (typeof factory !== "object") {
+        throw new Error(`Factory must be an object. Got ${factory} instead`);
       }
 
       const newState = produce(containerState, (draft: any) => {
-        draft[value.token] = value;
+        draft[token] = factory;
         return draft;
       });
 
@@ -215,12 +218,12 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             );
           const state = (containerState as any)[token];
 
-          if (!(state as DIFactory<Key>).dependencies) {
+          if (!(state as DIFactory).dependencies) {
             return state as T;
           }
 
-          return (state as DIFactory<Key>).factory(
-            ...(state as DIFactory<Key>).dependencies.map(
+          return (state as DIFactory).factory(
+            ...(state as DIFactory).dependencies.map(
               (dep: DIToken<unknown, string>) => diContainer.resolve(dep)
             )
           ) as T;
