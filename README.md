@@ -1,54 +1,85 @@
 # @fioc/core
 
-FIoC (Fluid Inversion of Control) is a lightweight dependency injection library for JavaScript and TypeScript applications. It simplifies dependency management with a flexible, type-safe approach, without requiring reflection. It serves as the foundation for the FIoC ecosystem, including integrations for React and Next.js. For stricter type safety, see [@fioc/strict](#fiocstrict).
+**FIoC (Fluid Inversion of Control)** is a lightweight, reflection-free dependency injection (DI) library for **TypeScript** and **JavaScript**.  
+It simplifies dependency management with **type safety**, **immutability**, and a **fluent builder API** — designed for both frontend and backend projects.
 
-## Features
+FIoC powers the broader ecosystem, including integrations for **React**, **Next.js**, and stricter compile-time validation with **@fioc/strict**.
 
-- 🪶 **Lightweight**: Only depends on Immer, integrates seamlessly
-- 🎯 **No Type Casting**: Dependencies resolve to correct types automatically
-- 🏗️ **Builder Pattern**: Fluent API for dependency registration
-- 🔄 **Immutable, unless you need otherwsie**: Immutable container state for safe concurrency with support for scoped dependencies and singletons
-- 🔌 **Universal**: Works in front-end and back-end environments
-- 🎮 **Flexible Factory System**: Supports value registration, factory functions, and class constructors
-- 🧩 **Modular Design**: Merge containers and switch configurations easily
-- 🔗 **Ecosystem Foundation**: Powers [@fioc/react](https://www.npmjs.com/package/@fioc/react), [@fioc/next](https://www.npmjs.com/package/@fioc/next), and [@fioc/strict](https://www.npmjs.com/package/@fioc/strict)
+> 💡 “Fluid” means your dependency graph is built fluently and safely — no decorators, no reflection metadata, no runtime hacks.
 
-[Jump to Basic Usage →](#basic-usage)
+---
 
-## Table of Contents
+## 🚀 Quick Start
 
-- [Installation](#installation)
-- [Basic Usage](#basic-usage)
-  - [Creating Tokens](#creating-tokens)
-  - [Registering & Resolving](#registering--resolving)
-- [Advanced Usage](#advanced-usage)
-  - [Factories](#factories)
-  - [Class Factories](#class-factories)
-  - [Scopes](#scopes)
-  - [Container Manager](#container-manager)
-- [FIOC Ecosystem](#fioc-ecosystem)
-
-## Installation
-
-Install using npm, pnpm, or yarn:
+Install via npm, yarn, or pnpm:
 
 ```bash
 npm install @fioc/core
-```
-
-```bash
-pnpm install @fioc/core
-```
-
-```bash
+# or
 yarn add @fioc/core
+# or
+pnpm add @fioc/core
 ```
 
-## Basic Usage
+A minimal “Hello World” example (with inference comments):
 
-### Creating Tokens
+```ts
+import { buildDIContainer, createDIToken } from "@fioc/core";
 
-Start by defining your interfaces:
+interface Logger {
+  log(message: string): void;
+}
+
+const LoggerToken = createDIToken<Logger>().as("Logger");
+// LoggerToken: DIToken<Logger, "Logger">
+
+const container = buildDIContainer()
+  .register(LoggerToken, { log: console.log })
+  .getResult();
+
+// Resolve — inferred return type is Logger
+const logger = container.resolve(LoggerToken); // logger: Logger
+logger.log("Hello, FIoC!");
+```
+
+---
+
+## ✨ Features
+
+- 🪶 **Lightweight** — zero reflection, minimal dependencies (only depends on [Immer](https://immerjs.github.io/immer/)).
+- 🎯 **Type-Safe Resolution** — no casting, all types inferred automatically.
+- 🧱 **Fluent Builder Pattern** — chainable, immutable container configuration.
+- 🔄 **Immutable by Default** — safe for concurrent or multithreaded use; supports scoped and singleton overrides.
+- 🔌 **Universal** — works in Node.js, browser, Deno, Bun, and serverless environments.
+- 🧩 **Flexible Factory System** — register values, factories, or class constructors.
+- ⚙️ **Composable Containers** — merge configurations or swap environments dynamically.
+- 🔗 **Ecosystem Foundation** — powers:
+  - [`@fioc/react`](https://www.npmjs.com/package/@fioc/react)
+  - [`@fioc/next`](https://www.npmjs.com/package/@fioc/next)
+  - [`@fioc/strict`](https://www.npmjs.com/package/@fioc/strict)
+
+---
+
+## 📘 Table of Contents
+
+- [Quick Start](#-quick-start)
+- [Creating Tokens](#creating-tokens)
+- [Registering & Resolving](#registering--resolving)
+- [Factories](#factories)
+- [Class Factories](#class-factories)
+- [Scopes](#scopes)
+- [Merge Containers](#merge-containers)
+- [Container Manager](#container-manager)
+- [Why FIoC?](#why-fioc)
+- [FIoC Ecosystem](#fioc-ecosystem)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## 🪄 Creating Tokens
+
+Tokens uniquely identify dependencies in the container.
 
 ```ts
 import { createDIToken } from "@fioc/core";
@@ -56,235 +87,289 @@ import { createDIToken } from "@fioc/core";
 interface ApiService {
   getData: () => string;
 }
-```
-
-Theres three ways to create tokens:
-
-Create tokens for dependencies using `createDIToken`. Pick this one for maximum compatibility with fioc/strict:
-
-```ts
-import { createDIToken } from "@fioc/core";
 
 const ApiServiceToken = createDIToken<ApiService>().as("ApiService");
+// ApiServiceToken: DIToken<ApiService, "ApiService">
 ```
 
-For less verbose, you can also use a casted Symbol. Should be migrated to createDIToken() in fioc/strict:
+Alternatively, you can use a manually casted `Symbol` (not compatible with `@fioc/strict`):
 
 ```ts
-import { createDIToken } from "@fioc/core";
+import { DIToken } from "@fioc/core";
 
 const ApiServiceToken: DIToken<ApiService> = Symbol.for("ApiService");
+// ApiServiceToken: DIToken<ApiService>
 ```
 
-### Registering & Resolving
+---
 
-Register and resolve dependencies using the container builder:
+## ⚙️ Registering & Resolving
 
 ```ts
 import { buildDIContainer } from "@fioc/core";
-import { ApiService, ApiServiceToken } from "./interfaces/ApiService";
+import { ApiServiceToken } from "./tokens";
 
-// Define the implementation
-const HttpApiService: ApiService = {
-  getData: () => "Hello, World!",
-};
+const HttpApiService: ApiService = { getData: () => "Hello, World!" };
 
-// Register the implementation for each token
 const container = buildDIContainer()
-  .register(ApiServiceToken, HttpApiService)
+  .register(ApiServiceToken, HttpApiService) // registers ApiService
   .getResult();
 
-// Will be automatically casted to ApiService
-const apiService = container.resolve(ApiServiceToken);
-apiService.getData(); // "Hello, World!"
+const api = container.resolve(ApiServiceToken); // api: ApiService
+api.getData(); // "Hello, World!"
 ```
 
-## Advanced Usage
+> Implementation note: FIoC containers are immutable; registering returns a new container builder result. You can merge containers by passing its states into a new container builder.
 
-### Factories
+---
 
-The main features of FIoC are achieved through factories. These factories recieve dependencies as tokens and return values.
+## 🏗️ Factories
 
-There's two ways to create factories. First is to do the config manually:
+Factories let you register logic that depends on other tokens.
+
+### Option 1 — Manual Configuration (with inference comments)
 
 ```ts
-import { ApiServiceToken } from "./interfaces/ApiService";
-import { HTTPApiService } from "./infrastructure/HTTPApiService";
 import { createFactoryDIToken, buildDIContainer } from "@fioc/core";
+import { ApiServiceToken } from "./tokens";
 
-// Define a factory
-export const getDataUseCaseFactory =
-  (apiService: ApiService) => (ids: string[]) =>
-    apiService.getData(ids);
+const getDataUseCaseFactory = (apiService: ApiService) => () =>
+  apiService.getData();
 
-export const getDataUseCaseToken =
-  createFactoryDIToken<typeof getDataUseCaseFactory>().as("getDataUseCase");
+const GetDataUseCaseToken =
+  createFactoryDIToken<typeof getDataUseCaseFactory>().as("GetDataUseCase");
+// GetDataUseCaseToken: FactoryDIToken<() => string, "GetDataUseCase">
 
-// Register factory with type-safe dependencies
 const container = buildDIContainer()
   .register(ApiServiceToken, HttpApiService)
-  .registerFactory(getDataUseCaseToken, {
-    dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
+  .registerFactory(GetDataUseCaseToken, {
+    dependencies: [ApiServiceToken], // Will get type error if doesn't match types and orders of factory's parameters
     factory: getDataUseCaseFactory,
   })
   .getResult();
 
-// Resolve and use. Type will be automatically casted to (ids: string[]) => Promise<string[]>
-const getDataUseCase = container.resolve(getDataUseCaseToken);
-getDataUseCase(["id1", "id2"]);
+const useCase = container.resolve(GetDataUseCaseToken); // useCase: () => string
+useCase();
 ```
 
-Or you can define a FIoC compatible factory thanks to the builder function `withDependencies`.
-Pick this one for a cleaner look:
+### Option 2 — With Dependencies Helper (clean & strongly typed)
 
 ```ts
-import { ApiServiceToken } from "./interfaces/ApiService";
-import { HTTPApiService } from "./infrastructure/HTTPApiService";
 import {
   withDependencies,
   createFactoryDIToken,
   buildDIContainer,
 } from "@fioc/core";
 
-// Types of the parameters of the factory will be automatically inferred based on the dependency tokens
-export const getDataUseCaseFactory = withDependencies(
-  ApiServiceToken
-).defineFactory((apiService) => (ids: string[]) => {
-  return apiService.getData(ids);
-});
+const getDataUseCaseFactory = withDependencies(ApiServiceToken).defineFactory(
+  (apiService /* inferred as ApiService */) => () => apiService.getData()
+);
 
-export const getDataUseCaseToken =
-  createFactoryDIToken<typeof getDataUseCaseFactory>().as("getDataUseCase");
+const GetDataUseCaseToken =
+  createFactoryDIToken<typeof getDataUseCaseFactory>().as("GetDataUseCase");
 
-// Cleaner registration
 const container = buildDIContainer()
-  .register(ApiServiceToken, HTTPApiService)
-  .registerFactory(getDataUseCaseToken, getDataUseCaseFactory);
+  .register(ApiServiceToken, HttpApiService)
+  .registerFactory(GetDataUseCaseToken, getDataUseCaseFactory);
 
-// Resolve and use. Type will be automatically casted to (ids: string[]) => Promise<string[]>
-const getDataUseCase = container.resolve(getDataUseCaseToken);
-getDataUseCase(["id1", "id2"]);
+const useCase = container.resolve(GetDataUseCaseToken); // useCase: () => string
+useCase();
 ```
 
-### Class Factories
+---
 
-Use classes with `constructorToFactory`:
+## 🧱 Class Factories
 
 ```ts
-import { ApiServiceToken } from "./interfaces/ApiService";
-import { HTTPApiService } from "./infrastructure/HTTPApiService";
-import { constructorToFactory, buildDIContainer } from "@fioc/core";
+import {
+  constructorToFactory,
+  buildDIContainer,
+  createDIToken,
+} from "@fioc/core";
 
-export class GetDataUseCase {
+class GetDataUseCase {
   constructor(private apiService: ApiService) {}
   execute = () => this.apiService.getData();
 }
 
-export const getDataUseCaseToken =
-  createDIToken<GetDataUseCase>().as("getDataUseCase");
+const GetDataUseCaseToken =
+  createDIToken<GetDataUseCase>().as("GetDataUseCase");
+// GetDataUseCaseToken: DIToken<GetDataUseCase, "GetDataUseCase">
 
 const container = buildDIContainer()
-  .register(ApiServiceToken, HTTPApiService)
-  .registerFactory(getDataUseCaseToken, {
+  .register(ApiServiceToken, HttpApiService)
+  .registerFactory(GetDataUseCaseToken, {
     dependencies: [ApiServiceToken],
     factory: constructorToFactory(GetDataUseCase),
   });
+
+// resolve and inferred type is GetDataUseCase
+const instance = container.resolve(GetDataUseCaseToken); // instance: GetDataUseCase
+instance.execute();
 ```
 
-### Scopes
+---
 
-When registering factories, you can specify the scope of the dependency.
-Available scopes are `transient`, `singleton`, and `scoped`. The default scope is `transient`.
+## 🌀 Scopes
 
-- `transient`: The dependency is resolved each time the factory is called.
-- `singleton`: The dependency is resolved once and reused for the lifetime of the container.
-- `scoped`: The dependency is resolved once and reused for the lifetime of the scope.
+**Clarified semantics and examples — with inference comments.**
+
+**Definitions**
+
+- `transient` (default): a new value/factory result is produced **every** time the token is resolved.
+- `singleton`: the first time the token is resolved in a given _container_, its value is created and then cached for all subsequent resolves on that container.
+- `scoped`: the token's value is cached **per scope**. Scopes are short-lived resolution contexts created from a container; each scope gets its own cache for scoped tokens.
+
+> Implementation note: FIoC containers are immutable; registering returns a new container builder result. Scopes are lightweight resolution contexts that reuse container registration metadata but keep separate caches for `scoped` instances.
+
+### Singleton example
 
 ```ts
-// Singleton
 const container = buildDIContainer()
-  .registerFactory(getDataUseCaseToken, getDataUseCaseFactory, "singleton")
+  .registerFactory(MyToken, myFactory, "singleton")
   .getResult();
 
-const resolvedA = container.resolve(getDataUseCaseToken);
-const resolvedB = container.resolve(getDataUseCaseToken);
-resolvedA === resolvedB; // true
+const a = container.resolve(MyToken); // a: Inferred type of MyToken
+const b = container.resolve(MyToken); // same cached instance
+a === b; // true
 ```
 
+### Transient example
+
 ```ts
-// Transient
 const container = buildDIContainer()
-  .registerFactory(getDataUseCaseToken, getDataUseCaseFactory)
+  .registerFactory(MyToken, myFactory, "transient") // or omit scope (default)
   .getResult();
 
-const resolvedA = container.resolve(getDataUseCaseToken);
-const resolvedB = container.resolve(getDataUseCaseToken);
-
-resolvedA !== resolvedB; // true
+const a = container.resolve(MyToken); // new instance/value
+const b = container.resolve(MyToken); // another new instance/value
+a === b; // false
 ```
 
+### Scoped example (callback-style)
+
 ```ts
-// Scoped
 const container = buildDIContainer()
-  .registerFactory(getDataUseCaseToken, getDataUseCaseFactory, "scoped")
+  .registerFactory(MyToken, myFactory, "scoped")
   .getResult();
 
-let resolvedA;
-let resolvedB;
+let resolvedA: ReturnType<typeof container.resolve>;
+let resolvedB: ReturnType<typeof container.resolve>;
 
 container.createScope((resolve) => {
-  resolvedA = resolve(getDataUseCaseToken);
-  resolvedB = resolve(getDataUseCaseToken);
+  // `resolve` has the same inference as container.resolve
+  resolvedA = resolve(MyToken); // resolvedA: inferred type
+  resolvedB = resolve(MyToken); // cached inside this scope
+  resolvedA === resolvedB; // true (same scope)
 });
 
-let resolvedC;
+// different scope -> different instance
 container.createScope((resolve) => {
-  resolvedC = resolve(getDataUseCaseToken);
+  const resolvedC = resolve(MyToken);
+  resolvedA === resolvedC; // false
 });
-
-resolvedA === resolvedB; // true
-resolvedC !== resolvedA; // true
 ```
 
-### Container Manager
+**When to use which**
 
-Manage multiple containers for different environments or testing:
+- Use `singleton` for heavy or long-lived services (database connections, caches).
+- Use `transient` for stateless factories or values where fresh instances are required.
+- Use `scoped` for per-request or per-job resources that should be reused inside a single operation but isolated across operations.
+
+---
+
+## 🔀 Merge Containers
+
+You can create isolated containers as modules and merge them together into a single container:
+
+```ts
+import { buildDIContainer } from "@fioc/core";
+
+const containerA = buildDIContainer()
+  .register(ApiServiceToken, HttpApiService)
+  .getResult();
+
+const containerB = buildDIContainer()
+  .register(ApiServiceToken, HttpApiService)
+  .getResult();
+
+const container = buildDIContainer()
+  .merge(containerA.getState())
+  .merge(containerB.getState())
+  .getResult();
+
+container.resolve(ApiServiceToken); // HttpApiService
+```
+
+## 🧩 Container Manager
+
+Switch between environments or test setups seamlessly:
 
 ```ts
 import { buildDIManager } from "@fioc/core";
 
-const ENVIRONMENT = process.env.APP_ENV || "development";
-
 const manager = buildDIManager()
   .registerContainer(productionContainer, "prod")
-  .registerContainer(testContainer, "development")
+  .registerContainer(testContainer, "test")
   .getResult()
-  .setDefaultContainer(ENVIRONMENT);
+  .setDefaultContainer(process.env.APP_ENV || "prod");
 
-// Get active container
 const container = manager.getContainer();
 ```
 
-Use cases for Container Manager:
+Use cases:
 
-- Managing production vs. development environments
-- Switching between online/offline implementations
-- Testing with mock implementations
+- Environment-specific containers
+- Online/offline or mock/live switching
+- Testing without global mutations
 
-## FIOC Ecosystem
+---
 
-The FIOC ecosystem provides specialized libraries for various use cases:
+## 🧩 Why FIoC
 
-- [@fioc/strict](https://www.npmjs.com/package/@fioc/strict): Enhanced type safety with compile-time validation, including type errors for unregistered or duplicate dependencies and type `never` when resolving unregistered dependencies.
-- [@fioc/react](https://www.npmjs.com/package/@fioc/react): Dependency injection for React applications, with hooks and context providers for seamless integration.
-- [@fioc/next](https://www.npmjs.com/package/@fioc/next): Optimized for Next.js, enabling type-safe integration with React Server Components and Server Actions.
+### Pros
 
-[Back to Top ↑](#fioccore)
+- **Reflection-free & decorator-free**: Works without reflect-metadata, decorators, or runtime hacks → fully compatible with Deno, Bun, Node, and browsers.
 
-## Contributing
+- **Immutable container state**: Safe for concurrent applications, serverless functions, and multi-threaded environments.
 
-Contributions are welcome! Feel free to open issues or submit pull requests on [GitHub](https://github.com/kolostring/fioc).
+- **Scoped lifecycles**: Supports transient, singleton, and scoped instances → flexible per-request, per-job, or long-lived resources.
 
-## License
+- **Strong TypeScript inference**: Minimal boilerplate; dependencies are automatically type-checked and inferred.
 
-This library is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+- **Fluent builder API**: Chainable, readable syntax for container registration and composition.
+
+- **Modular & composable**: Merge containers or swap configurations easily → ideal for testing or multi-environment setups.
+
+- **Tree-shakeable**: Only imported symbols are included in the final bundle → minimal footprint for frontend projects.
+
+- **Ecosystem ready**: Integrates with React (@fioc/react), Next.js (@fioc/next), and stricter type-checking (@fioc/strict).
+
+### Cons
+
+- **No automatic decorators**: Users coming from decorator-based DI libraries may need to adjust patterns.
+
+- **Requires explicit token management**: Every dependency needs a DIToken or factory token → slightly more verbose than reflection-based DI.
+
+---
+
+## 🌐 FIoC Ecosystem
+
+The FIoC ecosystem provides specialized libraries for various environments:
+
+- [`@fioc/strict`](https://www.npmjs.com/package/@fioc/strict): Enhanced type safety and compile-time validation.
+- [`@fioc/react`](https://www.npmjs.com/package/@fioc/react): Hooks and context-based DI for React.
+- [`@fioc/next`](https://www.npmjs.com/package/@fioc/next): Type-safe DI for Next.js Server Components and Actions.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!  
+Feel free to open issues or submit pull requests on [GitHub](https://github.com/kolostring/fioc). Please include tests for behavioral changes and keep changes small and focused.
+
+---
+
+## 📜 License
+
+Licensed under the [MIT License](./LICENSE).

@@ -1,6 +1,6 @@
 {
   "name": "@fioc/core",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "type": "module",
   "license": "MIT",
   "main": "./dist/cjs/index.cjs",
@@ -18,13 +18,17 @@
   },
   "keywords": [
     "dependency injection",
-    "functional dependency injection",
     "di container",
     "typescript",
+    "javascript",
     "ioc",
-    "fluid inversion of control"
+    "fluent api",
+    "tree-shakeable",
+    "modular di",
+    "react",
+    "nextjs"
   ],
-  "description": "A lightweight and type-safe dependency injection library for JS/TS, designed to simplify dependency management",
+  "description": "Fluent, type-safe IoC container for JS/TS, simplifying dependency management in React, Next.js, and Node.js projects",
   "author": "kolostring <yoerodriguezjunior@gmail.com>",
   "contributors": [
     {
