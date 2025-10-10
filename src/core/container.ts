@@ -60,7 +60,9 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
    *
    * @param callback Scoped code to execute
    */
-  createScope(callback: (resolve: <T>(token: DIToken<T>) => T) => void): void;
+  createScope<Return>(
+    callback: (resolve: <T>(token: DIToken<T>) => T) => Promise<Return>
+  ): Promise<Return>;
 }
 
 /**
@@ -257,7 +259,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             )
           ) as T;
         },
-        createScope(callback) {
+        async createScope(callback) {
           const instances: { [key: DIToken<any>]: any } = {};
           const scopedResolve: (typeof diContainer)["resolve"] = (
             token: DIToken<any>
@@ -270,7 +272,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             return resolved;
           };
 
-          callback(scopedResolve);
+          return await callback(scopedResolve);
         },
       };
 

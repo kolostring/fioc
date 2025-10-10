@@ -17,6 +17,8 @@ interface RepoB {
 }
 const RepoB = createDIToken<RepoB>().as("RepoB");
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 describe("Dependency Injection Container", () => {
   it("should resolve implementations correctly", () => {
     const repoAImpl: RepoA = { getFooA: () => "RepoA Result" };
@@ -93,7 +95,7 @@ describe("Dependency Injection Container", () => {
     expect(resolvedA !== resolvedB).toBeTruthy();
   });
 
-  it("should resolve scoped factories correctly", () => {
+  it("should resolve scoped factories correctly", async () => {
     const factoryCFactory = withDependencies(RepoA).defineFactory((repoA) => {
       return () => `Factory C depends on ${repoA.getFooA()}`;
     });
@@ -111,18 +113,24 @@ describe("Dependency Injection Container", () => {
     let resolvedA;
     let resolvedB;
 
-    container.createScope((resolve) => {
+    await container.createScope(async (resolve) => {
+      await sleep(100);
       resolvedA = resolve(factoryC);
       resolvedB = resolve(factoryC);
     });
 
     let resolvedC;
-    container.createScope((resolve) => {
+    await container.createScope(async (resolve) => {
+      await sleep(100);
       resolvedC = resolve(factoryC);
     });
 
     expect(resolvedA === resolvedB).toBeTruthy();
     expect(resolvedC !== resolvedA).toBeTruthy();
+
+    expect(resolvedA()).toBe("Factory C depends on A");
+    expect(resolvedB()).toBe("Factory C depends on A");
+    expect(resolvedC()).toBe("Factory C depends on A");
   });
 
   it("should resolve transient factory classes", () => {
@@ -209,13 +217,13 @@ describe("Dependency Injection Container", () => {
     let resolvedA;
     let resolvedB;
 
-    container.createScope((resolve) => {
+    container.createScope(async (resolve) => {
       resolvedA = resolve(factoryClassToken);
       resolvedB = resolve(factoryClassToken);
     });
 
     let resolvedC;
-    container.createScope((resolve) => {
+    container.createScope(async (resolve) => {
       resolvedC = resolve(factoryClassToken);
     });
 
