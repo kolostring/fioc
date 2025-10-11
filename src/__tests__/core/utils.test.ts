@@ -5,6 +5,7 @@ import {
   constructorToFactory,
   withDependencies,
   createFactoryDIToken,
+  DIContainer,
 } from "../..";
 
 interface RepoA {
@@ -73,6 +74,27 @@ describe("Dependency Injection Container", () => {
     const resolvedA = container.resolve(factoryC);
     const resolvedB = container.resolve(factoryC);
     expect(resolvedA === resolvedB).toBeTruthy();
+  });
+
+  it("should resolve itself correctly as dependency", () => {
+    const repoAImpl: RepoA = { getFooA: () => "A" };
+
+    const containerWrapper = withDependencies(DIContainer).defineFactory(
+      (diContainer) => {
+        return () => diContainer.resolve(RepoA);
+      }
+    );
+
+    const containerWrapperToken =
+      createFactoryDIToken<typeof containerWrapper>().as("containerWrapper");
+
+    const container = buildDIContainer()
+      .register(RepoA, repoAImpl)
+      .registerFactory(containerWrapperToken, containerWrapper)
+      .getResult();
+
+    const resolvedA = container.resolve(containerWrapperToken)();
+    expect(resolvedA).toBe(repoAImpl);
   });
 
   it("should resolve transient factories correctly", () => {

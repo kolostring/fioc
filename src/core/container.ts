@@ -1,6 +1,6 @@
 import { produce } from "immer";
 import { DIFactory } from "./factory";
-import { DIToken } from "./token";
+import { createDIToken, DIToken } from "./token";
 
 /**
  * Represents the state of a DI container.
@@ -18,7 +18,10 @@ export type DIContainerState<T = unknown[]> = {
  * @template State - The type representing the container's state
  * @template D - The type of dependencies managed by the container
  */
-export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
+export interface DIContainer<
+  State extends DIContainerState<D> = any,
+  D = unknown
+> {
   /**
    * Resolves a dependency or factory from the container.
    * For simple values, returns the registered value.
@@ -64,6 +67,12 @@ export interface DIContainer<State extends DIContainerState<D>, D = unknown> {
     callback: (resolve: <T>(token: DIToken<T>) => T) => Promise<Return>
   ): Promise<Return>;
 }
+
+/**
+ * DIToken for the DIContainer type.
+ * Use this token to inject the DIContainer itself.
+ */
+export const DIContainer = createDIToken<DIContainer>().as("DIContainer");
 
 /**
  * Represents a builder for creating an DI container.
@@ -196,6 +205,10 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
       }) as any;
     },
     register(token, value) {
+      if (token === DIContainer) {
+        throw new Error("DIContainer cannot be registered");
+      }
+
       const newState = produce(containerState, (draft: any) => {
         draft[token as DIToken<typeof value, string>] = value;
         return draft;
@@ -208,6 +221,10 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
     registerFactory(token, value, scope) {
       if (typeof value !== "object") {
         throw new Error(`Factory must be an object. Got ${value} instead`);
+      }
+
+      if (token === DIContainer) {
+        throw new Error("DIContainer cannot be registered");
       }
 
       const newState = produce(containerState, (draft: any) => {
@@ -240,6 +257,8 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         getState: () => containerState,
         resolve: <T, Key extends string>(toResolve: DIToken<unknown, Key>) => {
           const token = toResolve;
+
+          if (token === DIContainer) return diContainer as T;
 
           if (!(token in containerState))
             throw new Error(
