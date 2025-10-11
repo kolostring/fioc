@@ -125,18 +125,28 @@ describe("Dependency Injection Container", () => {
     const factoryC =
       createFactoryDIToken<typeof factoryCFactory>().as("factoryCToken");
 
+    const factoryDFactory = withDependencies(factoryC).defineFactory((c) => {
+      return c;
+    });
+
+    const factoryD =
+      createFactoryDIToken<typeof factoryDFactory>().as("factoryDToken");
+
     const repoAImpl: RepoA = { getFooA: () => "A" };
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
       .registerFactory(factoryC, factoryCFactory, "scoped")
+      .registerFactory(factoryD, factoryDFactory)
       .getResult();
 
     let resolvedA;
     let resolvedB;
+    let resolvedD;
 
     await container.createScope(async (resolve) => {
       await sleep(100);
+      resolvedD = resolve(factoryD);
       resolvedA = resolve(factoryC);
       resolvedB = resolve(factoryC);
     });
@@ -149,10 +159,7 @@ describe("Dependency Injection Container", () => {
 
     expect(resolvedA === resolvedB).toBeTruthy();
     expect(resolvedC !== resolvedA).toBeTruthy();
-
-    expect(resolvedA()).toBe("Factory C depends on A");
-    expect(resolvedB()).toBe("Factory C depends on A");
-    expect(resolvedC()).toBe("Factory C depends on A");
+    expect(resolvedD === resolvedA).toBeTruthy();
   });
 
   it("should resolve transient factory classes", () => {

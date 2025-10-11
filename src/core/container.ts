@@ -284,7 +284,30 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             token: DIToken<any>
           ) => {
             if (token in instances) return instances[token];
-            const resolved = diContainer.resolve(token);
+
+            if (token === DIContainer) return diContainer as T;
+
+            let resolved;
+
+            if (!(token in containerState))
+              throw new Error(
+                `Could not Resolve: Token Symbol(${Symbol.keyFor(
+                  token
+                )}) not found`
+              );
+
+            const state = (containerState as any)[token];
+
+            if (!(state as DIFactory).dependencies) {
+              resolved = state as T;
+            } else {
+              resolved = (state as DIFactory).factory(
+                ...(state as DIFactory).dependencies.map(
+                  (dep: DIToken<unknown, string>) => scopedResolve(dep)
+                )
+              );
+            }
+
             if ((diContainer.getState() as any)[token]?.["scope"] === "scoped")
               instances[token] = resolved;
 
