@@ -7,8 +7,18 @@ import { createDIToken, DIToken } from "./token";
  * This is a record mapping DI tokens to their corresponding implementations.
  * @template T - Array type containing the dependencies
  */
-export type DIContainerState<T = unknown[]> = {
-  [K in keyof T]: K extends DIToken<infer U, string> ? U : never;
+export type DIContainerState<T = any, R = any> = {
+  values: {
+    [K in keyof T]: K extends DIToken<infer U, string> ? U : never;
+  };
+  implementations: {
+    [K in keyof R]: R[K] extends DIToken<infer U, string>
+      ? DIToken<U>[]
+      : never;
+  };
+  references: {
+    [K in keyof R]: R[K] extends DIToken<any, string> ? DIToken<any>[] : never;
+  };
 };
 
 /**
@@ -40,9 +50,22 @@ export interface DIContainer<
    * const useCase = container.resolve(UseCaseToken);
    * ```
    */
-  resolve<T, Key extends string>(
-    token: DIToken<T, Key>
-  ): DIToken<T, Key> extends keyof State ? T : never;
+  resolve<T, Key extends string>(token: DIToken<T, Key>): T;
+
+  /**
+   * Finds and returns all registered DITokens that implement the base token
+   * and optionally match one of the provided generic tokens in their metadata.
+   *
+   * @param baseToken The interface token (e.g., RepositoryToken) to search for.
+   * @param generics An optional array of generic tokens (e.g., [UserToken]) for filtering.
+   * @returns An array of the concrete DIToken identifiers (e.g., [RepositoryImplAToken, ...]).
+   */
+  findImplementationTokens<TBase, TGeneric extends any[]>(
+    baseToken: DIToken<TBase>,
+    generics?: {
+      [K in keyof TGeneric]: DIToken<TGeneric[K]>;
+    }
+  ): DIToken<TBase>[];
 
   /**
    * Retrieves the current state of the container.
@@ -136,41 +159,6 @@ export interface DIContainerBuilder {
     scope?: "transient" | "singleton" | "scoped"
   ): DIContainerBuilder;
 
-  /**
-   * Registers multiple factories with the specified tokens. Will replace any existing factories for the tokens.
-   *
-   * @param values - The factories to register.
-   * @returns The updated DIContainerBuilder instance.
-   * @example
-   * ```typescript
-   * container.registerFactoryArray([
-   *   {
-   *     token: UseCaseToken,
-   *     dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
-   *     factory: UseCaseFactory
-   *   },
-   *   {
-   *     token: OtherUseCaseToken,
-   *     dependencies: [ApiServiceToken], // Type error if dependencies don't match factory params
-   *     factory: OtherUseCaseFactory
-   *   }
-   * ])
-   * ```
-   **/
-  registerFactoryArray<T extends readonly unknown[]>(values: {
-    [K in keyof T]: T[K] extends DIFactory<infer D, infer R> & {
-      token: DIToken<unknown, infer Key>;
-    }
-      ? T[K]
-      : T[K] extends {
-          token: DIToken<unknown, infer Key>;
-          dependencies: unknown[];
-          factory: (...args: infer Deps) => infer Res;
-        }
-      ? { token: DIToken<unknown, Key> } & DIFactory<Deps, Res>
-      : { token: DIToken<unknown, string> } & DIFactory;
-  }): DIContainerBuilder;
-
   getResult(): DIContainer<any>;
 }
 
@@ -195,7 +183,11 @@ function defineSingleton<
  * @returns A DI container builder for registering dependencies and creating a static container.
  */
 export function buildDIContainer<State extends DIContainerState<T>, T>(
-  containerState: State = {} as State
+  containerState: State = {
+    values: {},
+    implementations: {},
+    references: {},
+  } as State
 ): DIContainerBuilder {
   const diContainer: DIContainerBuilder = {
     merge(stateToMerge) {
@@ -209,13 +201,33 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         throw new Error("DIContainer cannot be registered");
       }
 
-      const newState = produce(containerState, (draft: any) => {
-        draft[token as DIToken<typeof value, string>] = value;
+      const newState = produce(containerState, (draft) => {
+        const { key, metadata } = token;
+        (draft.values as any)[key] = value;
+
+        metadata?.implements?.forEach((implementationToken) => {
+          const { key: implementationKey } = implementationToken;
+          const implementations = (draft.implementations as any)[
+            implementationKey
+          ];
+          if (!implementations)
+            (draft.implementations as any)[implementationKey] = [token];
+          else implementations.push(token);
+        });
+
+        metadata?.generics?.forEach((referencesToken) => {
+          const { key: referenceKey } = referencesToken;
+
+          const references = (draft.references as any)[referenceKey];
+          if (!references) (draft.references as any)[referenceKey] = [token];
+          else references.push(token);
+        });
+
         return draft;
       });
 
       return buildDIContainer(
-        newState as State & { [K in typeof token]: typeof value }
+        newState as State & { [K in typeof token.key]: typeof value }
       ) as unknown as ReturnType<DIContainerBuilder["register"]>;
     },
     registerFactory(token, value, scope) {
@@ -227,26 +239,36 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
         throw new Error("DIContainer cannot be registered");
       }
 
-      const newState = produce(containerState, (draft: any) => {
+      const newState = produce(containerState, (draft) => {
+        const { key, metadata } = token;
         const val =
           scope === "singleton"
             ? { ...value, factory: defineSingleton(value.factory) }
             : value;
 
-        draft[token] = {
+        (draft.values as any)[key] = {
           ...val,
           scope,
         };
-        return draft;
-      });
 
-      return buildDIContainer(newState) as unknown as any;
-    },
-    registerFactoryArray(values) {
-      const newState = produce(containerState, (draft: any) => {
-        values.forEach((value) => {
-          draft[value.token] = value;
+        metadata?.implements?.forEach((implementationToken) => {
+          const { key: implementationKey } = implementationToken;
+
+          const implementations = (draft.implementations as any)[
+            implementationKey
+          ];
+          if (!implementations)
+            (draft.implementations as any)[implementationKey] = [token];
+          else implementations.push(token);
         });
+
+        metadata?.generics?.forEach((referencesToken) => {
+          const { key: referenceKey } = referencesToken;
+          const references = (draft.references as any)[referenceKey];
+          if (!references) (draft.references as any)[referenceKey] = [token];
+          else references.push(token);
+        });
+
         return draft;
       });
 
@@ -256,17 +278,13 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
       const diContainer: DIContainer<State> = {
         getState: () => containerState,
         resolve: <T, Key extends string>(toResolve: DIToken<unknown, Key>) => {
-          const token = toResolve;
+          if (toResolve === DIContainer) return diContainer as T;
 
-          if (token === DIContainer) return diContainer as T;
+          const { key } = toResolve;
 
-          if (!(token in containerState))
-            throw new Error(
-              `Could not Resolve: Token Symbol(${Symbol.keyFor(
-                token
-              )}) not found`
-            );
-          const state = (containerState as any)[token];
+          if (!(key in containerState.values))
+            throw new Error(`Could not Resolve: Token "${key}" not found`);
+          const state = (containerState.values as any)[key];
 
           if (!(state as DIFactory).dependencies) {
             return state as T;
@@ -278,25 +296,46 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             )
           ) as T;
         },
+        findImplementationTokens(baseToken, generics) {
+          const { key: baseKey } = baseToken;
+          if (!(baseKey in containerState.implementations)) return [];
+
+          const implementations = containerState.implementations[baseKey];
+
+          return implementations.filter((token) => {
+            const { metadata } = token;
+            if (!metadata) return false;
+
+            return (
+              generics?.every((genericToken) => {
+                const { key: genericKey } = genericToken;
+                return (
+                  containerState.references[genericKey]?.includes(
+                    genericToken
+                  ) ?? false
+                );
+              }) ?? true
+            );
+          }) as any;
+        },
+
         async createScope(callback) {
-          const instances: { [key: DIToken<any>]: any } = {};
+          const instances: { [key: string]: any } = {};
           const scopedResolve: (typeof diContainer)["resolve"] = (
             token: DIToken<any>
           ) => {
-            if (token in instances) return instances[token];
+            if (token === DIContainer)
+              return { ...diContainer, resolve: scopedResolve };
 
-            if (token === DIContainer) return diContainer as T;
+            const { key } = token;
+            if (key in instances) return instances[key];
 
             let resolved;
 
-            if (!(token in containerState))
-              throw new Error(
-                `Could not Resolve: Token Symbol(${Symbol.keyFor(
-                  token
-                )}) not found`
-              );
+            if (!(key in containerState.values))
+              throw new Error(`Could not Resolve: Token "${key}" not found`);
 
-            const state = (containerState as any)[token];
+            const state = (containerState.values as any)[key];
 
             if (!(state as DIFactory).dependencies) {
               resolved = state as T;
@@ -308,8 +347,11 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
               );
             }
 
-            if ((diContainer.getState() as any)[token]?.["scope"] === "scoped")
-              instances[token] = resolved;
+            if (
+              (diContainer.getState().values as any)[key]?.["scope"] ===
+              "scoped"
+            )
+              instances[key] = resolved;
 
             return resolved;
           };

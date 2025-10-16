@@ -21,9 +21,15 @@ import { DIFactory } from "./factory";
  * const ApiServiceToken = createDIToken<ApiService>().as("ApiService");
  * ```
  */
-export type DIToken<T, Key extends string = string> = symbol & {
+export type DIToken<T, Key extends string = string> = {
+  key: Key;
+  metadata?: DITokenMetadata<T>;
   __TYPE__: T;
-  __KEY__: Key;
+};
+
+export type DITokenMetadata<T> = {
+  implements?: DIToken<T>[];
+  generics?: DIToken<any>[];
 };
 
 /**
@@ -54,8 +60,14 @@ export const createDIToken = <T>() => ({
    * @returns A type-safe DI token
    * ```
    */
-  as: <Key extends string>(key: Key): DIToken<T, Key> =>
-    Symbol.for(key) as DIToken<T, Key>,
+  as: <Key extends string>(
+    key: Key,
+    metadata?: DITokenMetadata<T>
+  ): DIToken<T, Key> =>
+    ({
+      key,
+      metadata,
+    } as DIToken<T, Key>),
 });
 
 /**
@@ -80,9 +92,9 @@ export const createFactoryDIToken = <T>() => ({
    * @returns A type-safe DI token
    * ```
    */
-  as: <Key extends string>(key: Key) =>
-    Symbol.for(key) as DIToken<
+  as: <Key extends string>(key: Key, metadata?: DITokenMetadata<T>) =>
+    ({ key, metadata } as DIToken<
       T extends DIFactory<any, infer R> ? R : never,
       Key
-    >,
+    >),
 });
