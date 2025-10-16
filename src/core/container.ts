@@ -51,6 +51,9 @@ export interface DIContainer<
    * ```
    */
   resolve<T, Key extends string>(token: DIToken<T, Key>): T;
+  resolveArray<T extends any[]>(tokens: {
+    [K in keyof T]: DIToken<T[K], string>;
+  }): T;
 
   /**
    * Finds and returns all registered DITokens that implement the base token
@@ -87,7 +90,7 @@ export interface DIContainer<
    * @param callback Scoped code to execute
    */
   createScope<Return>(
-    callback: (resolve: <T>(token: DIToken<T>) => T) => Promise<Return>
+    callback: (scopedContainer: DIContainer<State>) => Promise<Return>
   ): Promise<Return>;
 }
 
@@ -296,6 +299,9 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             )
           ) as T;
         },
+        resolveArray(tokens) {
+          return tokens.map((token) => diContainer.resolve(token)) as any;
+        },
         findImplementationTokens(baseToken, generics) {
           const { key: baseKey } = baseToken;
           if (!(baseKey in containerState.implementations)) return [];
@@ -325,7 +331,12 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             token: DIToken<any>
           ) => {
             if (token === DIContainer)
-              return { ...diContainer, resolve: scopedResolve };
+              return {
+                ...diContainer,
+                resolve: scopedResolve,
+                resolveArray: (tokens: DIToken<any>[]) =>
+                  tokens.map(scopedResolve),
+              };
 
             const { key } = token;
             if (key in instances) return instances[key];
@@ -356,7 +367,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             return resolved;
           };
 
-          return await callback(scopedResolve);
+          return await callback(scopedResolve(DIContainer));
         },
       };
 

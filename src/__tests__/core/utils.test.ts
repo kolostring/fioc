@@ -53,6 +53,11 @@ describe("Core Registration and Resolution", () => {
 
     expect(resolvedA).toBe("RepoA Result");
     expect(resolvedB).toBe("RepoB Result");
+
+    expect(container.resolveArray([RepoA, RepoB])).toEqual([
+      repoAImpl,
+      repoBImpl,
+    ]);
   });
 
   it("should resolve transient factories", () => {
@@ -145,17 +150,17 @@ describe("Scope Management (Singleton and Scoped Factories)", () => {
     let resolvedB;
     let resolvedD;
 
-    await container.createScope(async (resolve) => {
+    await container.createScope(async (scopedContainer) => {
       await sleep(100);
-      resolvedD = resolve(factoryD);
-      resolvedA = resolve(factoryC);
-      resolvedB = resolve(factoryC);
+      resolvedD = scopedContainer.resolve(factoryD);
+      resolvedA = scopedContainer.resolve(factoryC);
+      resolvedB = scopedContainer.resolve(factoryC);
     });
 
     let resolvedC;
-    await container.createScope(async (resolve) => {
+    await container.createScope(async (scopedContainer) => {
       await sleep(100);
-      resolvedC = resolve(factoryC);
+      resolvedC = scopedContainer.resolve(factoryC);
     });
 
     expect(resolvedA === resolvedB).toBeTruthy(); // Same instance within scope
@@ -232,14 +237,14 @@ describe("Factory Classes (using constructorToFactory)", () => {
     let resolvedA;
     let resolvedB;
 
-    container.createScope(async (resolve) => {
-      resolvedA = resolve(factoryClassToken);
-      resolvedB = resolve(factoryClassToken);
+    container.createScope(async (scopedContainer) => {
+      resolvedA = scopedContainer.resolve(factoryClassToken);
+      resolvedB = scopedContainer.resolve(factoryClassToken);
     });
 
     let resolvedC;
-    container.createScope(async (resolve) => {
-      resolvedC = resolve(factoryClassToken);
+    container.createScope(async (scopedContainer) => {
+      resolvedC = scopedContainer.resolve(factoryClassToken);
     });
 
     expect(resolvedA === resolvedB).toBeTruthy();
