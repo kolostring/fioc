@@ -51,9 +51,29 @@ export interface DIContainer<
    * ```
    */
   resolve<T, Key extends string>(token: DIToken<T, Key>): T;
+
+  /**
+   * Resolves an array of tokens.
+   *
+   * @param tokens - An array of tokens to resolve
+   */
   resolveArray<T extends any[]>(tokens: {
     [K in keyof T]: DIToken<T[K], string>;
   }): T;
+
+  /**
+   * Resolves an array of tokens by their base type and generic arguments.
+   *
+   * @param baseToken - The base token to search for. Will match any implementations of this token.
+   * @param generics - An optional array of generic tokens (e.g., [UserToken]) for filtering.
+   * @returns - An array of resolved instances with the type of the base token.
+   */
+  resolveByMetadata<TBase, TGeneric extends any[]>(
+    baseToken: DIToken<TBase>,
+    generics?: {
+      [K in keyof TGeneric]: DIToken<TGeneric[K]>;
+    }
+  ): TBase[];
 
   /**
    * Finds and returns all registered DITokens that implement the base token
@@ -90,8 +110,8 @@ export interface DIContainer<
    * @param callback Scoped code to execute
    */
   createScope<Return>(
-    callback: (scopedContainer: DIContainer<State>) => Promise<Return>
-  ): Promise<Return>;
+    callback: (scopedContainer: DIContainer<State>) => Return
+  ): Return;
 }
 
 /**
@@ -359,8 +379,12 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             );
           }) as any;
         },
-
-        async createScope(callback) {
+        resolveByMetadata(baseToken, generics) {
+          return diContainer.resolveArray(
+            diContainer.findImplementationTokens(baseToken, generics)
+          );
+        },
+        createScope(callback) {
           const instances: { [key: string]: any } = {};
           const scopedResolve: (typeof diContainer)["resolve"] = (
             token: DIToken<any>
@@ -402,7 +426,7 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
             return resolved;
           };
 
-          return await callback(scopedResolve(DIContainer));
+          return callback(scopedResolve(DIContainer));
         },
       };
 
