@@ -162,6 +162,36 @@ export interface DIContainerBuilder {
     scope?: "transient" | "singleton" | "scoped"
   ): DIContainerBuilder;
 
+  /**
+   * Registers a new factory with the specified token as singleton. Simple wrapper for registerFactory with scope = "singleton"
+   *
+   * @param token token of the factory
+   * @param factoryWithDeps the factory to register
+   */
+  registerSingletonFactory<
+    Key extends string,
+    Deps extends readonly any[],
+    Return = unknown
+  >(
+    token: DIToken<Return, Key>,
+    factoryWithDeps: DIFactory<Deps, Return>
+  ): DIContainerBuilder;
+
+  /**
+   * Registers a new factory with the specified token as scoped. Simple wrapper for registerFactory with scope = "scoped"
+   *
+   * @param token token of the factory
+   * @param factoryWithDeps the factory to register
+   */
+  registerScopedFactory<
+    Key extends string,
+    Deps extends readonly any[],
+    Return = unknown
+  >(
+    token: DIToken<Return, Key>,
+    factoryWithDeps: DIFactory<Deps, Return>
+  ): DIContainerBuilder;
+
   getResult(): DIContainer<any>;
 }
 
@@ -277,6 +307,12 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
 
       return buildDIContainer(newState) as unknown as any;
     },
+    registerScopedFactory(token, value) {
+      return diContainer.registerFactory(token, value, "scoped");
+    },
+    registerSingletonFactory(token, value) {
+      return diContainer.registerFactory(token, value, "singleton");
+    },
     getResult(): DIContainer<State> {
       const diContainer: DIContainer<State> = {
         getState: () => containerState,
@@ -316,9 +352,8 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
               generics?.every((genericToken) => {
                 const { key: genericKey } = genericToken;
                 return (
-                  containerState.references[genericKey]?.includes(
-                    genericToken
-                  ) ?? false
+                  containerState.references[genericKey]?.includes(token) ??
+                  false
                 );
               }) ?? true
             );
