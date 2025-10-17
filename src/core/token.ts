@@ -27,8 +27,15 @@ export type DIToken<T, Key extends string = string> = {
   __TYPE__: T;
 };
 
+/**
+ * Represents the metadata associated with a DIToken.
+ *
+ * @template T - The type of the token
+ */
 export type DITokenMetadata<T> = {
-  implements?: DIToken<T>[];
+  implements?: T extends DIFactory
+    ? DIToken<ReturnType<T["factory"]>>[]
+    : DIToken<T>[];
   generics?: DIToken<any>[];
 };
 
