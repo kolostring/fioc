@@ -6,6 +6,7 @@ import {
   withDependencies,
   createFactoryDIToken,
   DIContainer,
+  buildDIContainerManager,
 } from "../..";
 
 // =====================================================================
@@ -31,6 +32,22 @@ interface ServiceB {
   getB: () => string;
 }
 const ServiceB = createDIToken<ServiceB>().as("ServiceB");
+
+interface User {
+  getName: () => string;
+}
+const UserToken = createDIToken<User>().as("User");
+
+interface Product {
+  getProductName: () => string;
+}
+const ProductToken = createDIToken<Product>().as("Product");
+
+interface Repository<T> {
+  get(): T;
+}
+
+const RepositoryToken = createDIToken<Repository<any>>().as("Repository");
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -115,7 +132,7 @@ describe("Scope Management (Singleton and Scoped Factories)", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactory(factoryC, factoryCFactory, "singleton")
+      .registerSingletonFactory(factoryC, factoryCFactory)
       .getResult();
 
     const resolvedA = container.resolve(factoryC);
@@ -142,7 +159,7 @@ describe("Scope Management (Singleton and Scoped Factories)", () => {
 
     const container = buildDIContainer()
       .register(RepoA, repoAImpl)
-      .registerFactory(factoryC, factoryCFactory, "scoped")
+      .registerScopedFactory(factoryC, factoryCFactory)
       .registerFactory(factoryD, factoryDFactory)
       .getResult();
 
@@ -151,10 +168,11 @@ describe("Scope Management (Singleton and Scoped Factories)", () => {
     let resolvedD;
 
     await container.createScope(async (scopedContainer) => {
-      await sleep(100);
-      resolvedD = scopedContainer.resolve(factoryD);
-      resolvedA = scopedContainer.resolve(factoryC);
-      resolvedB = scopedContainer.resolve(factoryC);
+      [resolvedD, resolvedA, resolvedB] = scopedContainer.resolveArray([
+        factoryD,
+        factoryC,
+        factoryC,
+      ]);
     });
 
     let resolvedC;
@@ -364,22 +382,6 @@ describe("Advanced Composition and Metadata", () => {
   });
 
   it("should allow type metadata to be registered", () => {
-    interface User {
-      getName: () => string;
-    }
-    const UserToken = createDIToken<User>().as("User");
-
-    interface Product {
-      getProductName: () => string;
-    }
-    const ProductToken = createDIToken<Product>().as("Product");
-
-    interface Repository<T> {
-      get(): T;
-    }
-
-    const RepositoryToken = createDIToken<Repository<any>>().as("Repository");
-
     const RepositoryImplAFn: Repository<User> = {
       get: () => ({ getName: () => "UserA" }),
     };
@@ -407,23 +409,62 @@ describe("Advanced Composition and Metadata", () => {
       .register(RepositoryImplB, RepositoryImplBFn)
       .getResult();
 
+    expect(container.findImplementationTokens(RepositoryToken)).toEqual([
+      RepositoryImplA,
+      RepositoryImplB,
+    ]);
     expect(
-      container
-        .findImplementationTokens(RepositoryToken)
-        .every(
-          (token) => token === RepositoryImplA || token === RepositoryImplB
-        )
-    ).toBeTruthy();
+      container.findImplementationTokens(RepositoryToken, [ProductToken])
+    ).toEqual([RepositoryImplB]);
     expect(
-      container
-        .findImplementationTokens(RepositoryToken, [ProductToken])
-        .every((token) => token === RepositoryImplB)
-    ).toBeTruthy();
+      container.findImplementationTokens(RepositoryToken, [UserToken])
+    ).toEqual([RepositoryImplA]);
     expect(
-      container
-        .findImplementationTokens(RepositoryToken, [ProductToken, UserToken])
-        .every((token) => token === RepositoryImplA)
-    ).toBeTruthy();
+      container.findImplementationTokens(RepositoryToken, [
+        ProductToken,
+        UserToken,
+      ])
+    ).toEqual([]);
+  });
+
+  it("should allow factory type metadata to be registered", () => {
+    type Either<L, R> =
+      | {
+          left: L;
+        }
+      | {
+          right: R;
+        };
+
+    type ResultFunction<T, R> = (...args: any[]) => Either<T, R>;
+
+    const EitherFunctionToken =
+      createDIToken<ResultFunction<any, any>>().as("EitherFunction");
+    const ErrorToken = createDIToken<Error>().as("Error");
+
+    const ProductResultFactory = withDependencies().defineFactory(
+      (): ResultFunction<Product, Error> => (l: Product) => {
+        return { left: l } as Either<Product, Error>;
+      }
+    );
+
+    const ProductResultToken = createFactoryDIToken<
+      typeof ProductResultFactory
+    >().as("ProductResult", {
+      implements: [EitherFunctionToken],
+      generics: [ProductToken, ErrorToken],
+    });
+
+    const container = buildDIContainer()
+      .registerFactory(ProductResultToken, ProductResultFactory)
+      .getResult();
+
+    expect(container.findImplementationTokens(EitherFunctionToken)).toEqual([
+      ProductResultToken,
+    ]);
+    expect(
+      container.findImplementationTokens(EitherFunctionToken, [ProductToken])
+    ).toEqual([ProductResultToken]);
   });
 });
 
@@ -444,6 +485,17 @@ describe("Error Handling", () => {
       .getResult();
 
     expect(() => container.resolve(factory)).toThrowError('"RepoA" not found');
+  });
+
+  it("should throw an error when registering an invalid Factory", () => {
+    const factory = createDIToken<ReturnType<() => any>>().as("factoryToken");
+
+    expect(() =>
+      buildDIContainer()
+        // @ts-expect-error - invalid factory
+        .registerFactory(factory, "string")
+        .getResult()
+    ).toThrowError("Factory must be an object.");
   });
 
   it("should throw an error when resolving an unregistered token", () => {
@@ -480,6 +532,109 @@ describe("Error Handling", () => {
     // Depending on the implementation, this will be "Maximum call stack size exceeded"
     // or a more specific error message from the DI library.
     expect(() => container.resolve(factoryD)).toThrowError();
+  });
+
+  it("should throw an error when trying to register a DIContainer", () => {
+    const container = buildDIContainer();
+
+    expect(() =>
+      container.register(DIContainer, container.getResult())
+    ).toThrowError("DIContainer cannot be registered");
+  });
+
+  it("should throw an error when trying to register a DIContainer in scoped environment", () => {
+    const container = buildDIContainer().getResult();
+
+    container.createScope(async () => {
+      expect(() =>
+        buildDIContainer().register(DIContainer, container)
+      ).toThrowError("DIContainer cannot be registered");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------
+
+describe("Container Manager", () => {
+  it("should allow registering multiple containers", () => {
+    const containerA = buildDIContainer()
+      .register(RepoA, { getFooA: () => "A" })
+      .getResult();
+    const containerB = buildDIContainer()
+      .register(RepoB, { getFooB: () => "B" })
+      .getResult();
+
+    const manager = buildDIContainerManager()
+      .registerContainer(containerA)
+      .registerContainer(containerB, "B")
+      .getResult();
+
+    expect(manager.getContainer().resolve(RepoA).getFooA()).toBe("A");
+    expect(manager.getContainer("B").resolve(RepoB).getFooB()).toBe("B");
+  });
+
+  it("should allow switching between containers", () => {
+    const containerA = buildDIContainer()
+      .register(RepoA, { getFooA: () => "A" })
+      .getResult();
+    const containerB = buildDIContainer()
+      .register(RepoB, { getFooB: () => "B" })
+      .getResult();
+
+    const manager = buildDIContainerManager()
+      .registerContainer(containerA)
+      .registerContainer(containerB, "B")
+      .getResult();
+
+    expect(
+      manager.setDefaultContainer("B").getContainer().resolve(RepoB).getFooB()
+    ).toBe("B");
+
+    expect(manager.getState().currentContainer).toBe("default");
+  });
+
+  it("should throw an error when registering a container with the same key", () => {
+    const containerA = buildDIContainer().getResult();
+    const containerB = buildDIContainer().getResult();
+
+    expect(() =>
+      buildDIContainerManager()
+        .registerContainer(containerA)
+        .registerContainer(containerB)
+        .getResult()
+    ).toThrowError("Container default already exists");
+  });
+
+  it("should throw an error when getting an unregistered container", () => {
+    const containerA = buildDIContainer().getResult();
+    const containerB = buildDIContainer().getResult();
+
+    const manager = buildDIContainerManager()
+      .registerContainer(containerA)
+      .registerContainer(containerB, "B")
+      .getResult();
+
+    expect(() => manager.getContainer("C")).toThrowError(
+      "Container C not found"
+    );
+
+    expect(() =>
+      buildDIContainerManager().getResult().getContainer()
+    ).toThrowError("Container default not found");
+  });
+
+  it("should throw an error when switching to an unregistered container", () => {
+    const containerA = buildDIContainer().getResult();
+    const containerB = buildDIContainer().getResult();
+
+    const manager = buildDIContainerManager()
+      .registerContainer(containerA)
+      .registerContainer(containerB, "B")
+      .getResult();
+
+    expect(() => manager.setDefaultContainer("C")).toThrowError(
+      "Container C not found"
+    );
   });
 });
 

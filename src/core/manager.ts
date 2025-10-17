@@ -94,7 +94,7 @@ export function buildDIContainerManager(
       const diManager: DIManager = {
         getContainer(key: string | undefined) {
           if (!containers[key ?? currentContainer])
-            throw new Error("Container not found");
+            throw new Error(`Container ${key ?? currentContainer} not found`);
           return buildDIContainer(
             containers[key ?? currentContainer]
           ).getResult();
