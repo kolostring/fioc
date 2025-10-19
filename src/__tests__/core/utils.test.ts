@@ -361,7 +361,6 @@ describe("Advanced Composition and Metadata", () => {
       .getResult();
 
     const containerC = buildDIContainer()
-      .register(RepoA, repoAImpl)
       .registerFactory(factoryC, {
         factory: factoryCFactory,
         dependencies: [RepoA],

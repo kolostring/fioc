@@ -245,8 +245,18 @@ export function buildDIContainer<State extends DIContainerState<T>, T>(
   const diContainer: DIContainerBuilder = {
     merge(stateToMerge) {
       return buildDIContainer({
-        ...containerState,
-        ...stateToMerge,
+        implementations: {
+          ...containerState.implementations,
+          ...stateToMerge.implementations,
+        },
+        references: {
+          ...containerState.references,
+          ...stateToMerge.references,
+        },
+        values: {
+          ...containerState.values,
+          ...stateToMerge.values,
+        },
       }) as any;
     },
     register(token, value) {
