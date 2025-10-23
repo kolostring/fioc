@@ -99,7 +99,10 @@ export const createFactoryDIToken = <T>() => ({
    * @returns A type-safe DI token
    * ```
    */
-  as: <Key extends string>(key: Key, metadata?: DITokenMetadata<T>) =>
+  as: <Key extends string>(
+    key: Key,
+    metadata?: DITokenMetadata<T extends DIFactory<any, infer R> ? R : never>
+  ) =>
     ({ key, metadata } as DIToken<
       T extends DIFactory<any, infer R> ? R : never,
       Key
